@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/animated-chart-library-mwify6
   workflow_dispatch:
 
 permissions:
