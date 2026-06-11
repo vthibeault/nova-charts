@@ -25,6 +25,8 @@ const css = `
   width: 100%;
   height: 100%;
   overflow: visible;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 .nova-overlay {
   position: absolute;

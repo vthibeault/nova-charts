@@ -32,16 +32,29 @@ export class PointerTracker {
     };
 
     const move = (e: PointerEvent): void => onMove(toLocal(e));
-    const leave = (): void => onMove(null);
-    const click = (e: PointerEvent): void => onClick?.(toLocal(e));
+    // Touch pointers "leave" as soon as the finger lifts; keep the hover
+    // state (tooltip/crosshair) visible after a tap instead of flashing it.
+    const leave = (e: PointerEvent): void => {
+      if (e.pointerType !== 'touch') onMove(null);
+    };
+    // A tap never fires pointermove, so treat pointerdown as a hover update
+    // first (shows the tooltip), then as a click.
+    const down = (e: PointerEvent): void => {
+      const p = toLocal(e);
+      onMove(p);
+      onClick?.(p);
+    };
+
+    // Horizontal drags scrub the chart; vertical drags still scroll the page.
+    svg.style.touchAction = 'pan-y';
 
     svg.addEventListener('pointermove', move);
     svg.addEventListener('pointerleave', leave);
-    svg.addEventListener('pointerdown', click);
+    svg.addEventListener('pointerdown', down);
     this.detach.push(
       () => svg.removeEventListener('pointermove', move),
       () => svg.removeEventListener('pointerleave', leave),
-      () => svg.removeEventListener('pointerdown', click),
+      () => svg.removeEventListener('pointerdown', down),
     );
   }
 
