@@ -1,0 +1,42 @@
+import { mountLineDemo } from './demos/line.js';
+import { mountAreaDemo } from './demos/area.js';
+import { mountBarDemo } from './demos/bar.js';
+import { mountDonutDemo } from './demos/donut.js';
+import { mountScatterDemo } from './demos/scatter.js';
+import { mountStressDemo } from './demos/stress.js';
+
+type DemoMount = (host: HTMLElement) => () => void;
+
+const demos: { id: string; name: string; mount: DemoMount }[] = [
+  { id: 'line', name: 'Line', mount: mountLineDemo },
+  { id: 'area', name: 'Area', mount: mountAreaDemo },
+  { id: 'bar', name: 'Bar', mount: mountBarDemo },
+  { id: 'donut', name: 'Donut / Pie', mount: mountDonutDemo },
+  { id: 'scatter', name: 'Scatter / Bubble', mount: mountScatterDemo },
+  { id: 'stress', name: 'Stress test', mount: mountStressDemo },
+];
+
+const nav = document.getElementById('nav')!;
+const main = document.getElementById('main')!;
+let cleanup: (() => void) | null = null;
+
+function route(): void {
+  const id = location.hash.slice(1) || demos[0]!.id;
+  const demo = demos.find((d) => d.id === id) ?? demos[0]!;
+  cleanup?.();
+  main.textContent = '';
+  cleanup = demo.mount(main as HTMLElement);
+  for (const a of nav.querySelectorAll('a')) {
+    a.classList.toggle('active', a.getAttribute('href') === `#${demo.id}`);
+  }
+}
+
+for (const d of demos) {
+  const a = document.createElement('a');
+  a.href = `#${d.id}`;
+  a.textContent = d.name;
+  nav.appendChild(a);
+}
+
+window.addEventListener('hashchange', route);
+route();
