@@ -9,7 +9,7 @@ import { scaleLinear, type LinearScale } from '../scale/linear.js';
 import { scaleBand, type BandScale } from '../scale/band.js';
 import { niceDomain } from '../scale/ticks.js';
 import { resolveColor } from '../theme/theme.js';
-import { fmtValue } from '../core/format.js';
+import { fmtValue, datumValue } from '../core/format.js';
 import type { PointerPos } from '../interaction/pointer.js';
 
 export interface WaterfallChartOptions extends BaseChartOptions {
@@ -72,7 +72,7 @@ export class WaterfallChart extends XYChart<WaterfallChartOptions> {
     const labels = this.options.data.labels ?? [];
     let run = 0;
     const out = series.data.map((d, i) => {
-      const delta = typeof d === 'number' ? d : d.y;
+      const delta = datumValue(d);
       const start = run;
       run += delta;
       return {

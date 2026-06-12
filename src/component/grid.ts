@@ -17,27 +17,49 @@ interface LineItem extends JoinItem {
   remove?: () => void;
 }
 
-/** Horizontal grid lines that glide with the y-domain (keyed like axis ticks). */
+/**
+ * Grid lines that glide with the domain (keyed like axis ticks).
+ * Horizontal lines move along y; vertical lines (e.g. time grids) along x.
+ */
 export class Grid {
   private g: SVGGElement;
   private items = new Map<string, LineItem>();
 
-  constructor(parent: SVGElement, private spring: Partial<SpringConfig> = {}) {
+  constructor(
+    parent: SVGElement,
+    private spring: Partial<SpringConfig> = {},
+    private orient: 'horizontal' | 'vertical' = 'horizontal',
+  ) {
     this.g = svgEl('g', { class: 'nova-grid' }, parent);
+  }
+
+  private span(line: SVGLineElement, plot: Rect): void {
+    if (this.orient === 'horizontal') {
+      line.setAttribute('x1', String(plot.x));
+      line.setAttribute('x2', String(plot.x + plot.width));
+    } else {
+      line.setAttribute('y1', String(plot.y));
+      line.setAttribute('y2', String(plot.y + plot.height));
+    }
+  }
+
+  private place(line: SVGLineElement, pos: number): void {
+    line.setAttribute(
+      'transform',
+      this.orient === 'horizontal' ? `translate(0, ${pos})` : `translate(${pos}, 0)`,
+    );
   }
 
   update(lines: GridLineSpec[], plot: Rect, immediate: boolean): void {
     keyedJoin(this.items, lines.map((l) => [l.key, l] as const), {
       enter: (_key, l) => {
-        const line = svgEl(
-          'line',
-          { x1: plot.x, x2: plot.x + plot.width, transform: `translate(0, ${l.pos})` },
-          this.g,
-        );
+        const line = svgEl('line', {}, this.g);
+        this.span(line, plot);
+        this.place(line, l.pos);
         const pos = new AnimatedValue(l.pos, this.spring);
         const opacity = new AnimatedValue(0, this.spring);
         const item: LineItem = { line, pos, opacity };
-        pos.onChange((v) => line.setAttribute('transform', `translate(0, ${v})`));
+        pos.onChange((v) => this.place(line, v));
         opacity.onChange((v) => {
           line.setAttribute('opacity', String(Math.max(v, 0)));
           if (item.exiting && v < 0.02) {
@@ -49,8 +71,7 @@ export class Grid {
         return item;
       },
       update: (item, l) => {
-        item.line.setAttribute('x1', String(plot.x));
-        item.line.setAttribute('x2', String(plot.x + plot.width));
+        this.span(item.line, plot);
         item.pos.set(l.pos, { immediate });
         item.opacity.set(1, { immediate });
       },

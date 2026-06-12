@@ -9,6 +9,8 @@ export { HeatmapChart, type HeatmapChartOptions } from './chart/heatmap.js';
 export { PolarAreaChart, type PolarAreaChartOptions } from './chart/polar.js';
 export { FunnelChart, type FunnelChartOptions } from './chart/funnel.js';
 export { WaterfallChart, type WaterfallChartOptions } from './chart/waterfall.js';
+export { CandlestickChart, type CandlestickChartOptions } from './chart/candlestick.js';
+export { GanttChart, type GanttChartOptions, type GanttTask } from './chart/gantt.js';
 
 export { Chart } from './core/chart.js';
 export type {
@@ -19,6 +21,7 @@ export type {
   HoverPoint,
   Margin,
   MotionOptions,
+  OHLC,
   Point,
   PointEvent,
   Rect,

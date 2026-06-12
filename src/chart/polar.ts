@@ -8,7 +8,7 @@ import { Tooltip } from '../component/tooltip.js';
 import { Legend } from '../component/legend.js';
 import { PointerTracker, type PointerPos } from '../interaction/pointer.js';
 import { paletteVar, resolveColor } from '../theme/theme.js';
-import { fmtValue, fmtLabel } from '../core/format.js';
+import { fmtValue, fmtLabel, datumValue } from '../core/format.js';
 import { niceDomain } from '../scale/ticks.js';
 
 export interface PolarAreaChartOptions extends BaseChartOptions {
@@ -91,7 +91,7 @@ export class PolarAreaChart extends Chart<PolarAreaChartOptions> {
       return {
         key: label,
         label,
-        value: Math.max(typeof d === 'number' ? d : d.y, 0),
+        value: Math.max(datumValue(d), 0),
         color: paletteVar(i),
       };
     });

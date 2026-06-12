@@ -6,7 +6,7 @@ import type {
   TooltipContent,
 } from '../core/types.js';
 import { svgEl } from '../core/svg.js';
-import { fmtLabel, fmtValue } from '../core/format.js';
+import { datumValue, fmtLabel, fmtValue } from '../core/format.js';
 import { Axis } from '../component/axis.js';
 import { Grid } from '../component/grid.js';
 import { Tooltip } from '../component/tooltip.js';
@@ -73,7 +73,7 @@ export abstract class XYChart<O extends BaseChartOptions = BaseChartOptions> ext
   }
 
   protected valuesOf(series: Series): number[] {
-    return series.data.map((d) => (typeof d === 'number' ? d : d.y));
+    return series.data.map(datumValue);
   }
 
   protected yDomain(includeZero: boolean): [number, number] {
