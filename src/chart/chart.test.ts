@@ -7,6 +7,9 @@ import { DonutChart } from './donut.js';
 import { RadarChart } from './radar.js';
 import { GaugeChart } from './gauge.js';
 import { HeatmapChart } from './heatmap.js';
+import { PolarAreaChart } from './polar.js';
+import { FunnelChart } from './funnel.js';
+import { WaterfallChart } from './waterfall.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -101,6 +104,83 @@ describe('AreaChart smoke', () => {
     for (const f of fills) {
       expect(f.getAttribute('d')).toMatch(/Z$/);
     }
+    chart.destroy();
+  });
+
+  it('stacked mode piles bands: second band tops sit above first band tops', () => {
+    const el = host();
+    const chart = new AreaChart(el, {
+      data: {
+        labels: ['a', 'b'],
+        series: [
+          { id: 's1', data: [10, 10] },
+          { id: 's2', data: [5, 5] },
+        ],
+      },
+      stacked: true,
+      showPoints: false,
+      curve: 'linear',
+    });
+    const fills = [...el.querySelectorAll('svg path[fill]:not([fill="none"])')];
+    expect(fills.length).toBe(2);
+    // First y coordinate of each fill path: s2's band top (15) must be
+    // higher on screen (smaller y) than s1's (10).
+    const firstY = (d: string): number => Number(/M[\d.]+,([\d.]+)/.exec(d)![1]);
+    const ys = fills.map((f) => firstY(f.getAttribute('d')!));
+    expect(Math.min(...ys)).toBeLessThan(Math.max(...ys));
+    chart.destroy();
+  });
+});
+
+describe('PolarAreaChart smoke', () => {
+  it('renders petals with value-scaled radii and ring grid', () => {
+    const el = host();
+    const chart = new PolarAreaChart(el, {
+      data: { labels: ['A', 'B', 'C'], series: [{ id: 'p', data: [10, 20, 30] }] },
+    });
+    expect(el.querySelectorAll('svg path').length).toBe(3);
+    expect(el.querySelectorAll('svg circle').length).toBe(4); // rings
+    chart.toggleSeries('B');
+    const ds = [...el.querySelectorAll('svg path')].map((p) => p.getAttribute('d'));
+    expect(ds.filter((d) => d === '').length).toBe(1); // collapsed slice
+    chart.destroy();
+  });
+});
+
+describe('FunnelChart smoke', () => {
+  it('renders one trapezoid per stage with labels and percentages', () => {
+    const el = host();
+    const chart = new FunnelChart(el, {
+      data: { labels: ['Top', 'Mid', 'Low'], series: [{ id: 'f', data: [100, 50, 25] }] },
+    });
+    expect(el.querySelectorAll('svg path').length).toBe(3);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('Top');
+    expect(texts.some((t) => t?.includes('50%'))).toBe(true);
+    chart.setData({ labels: ['Top', 'Low'], series: [{ id: 'f', data: [80, 20] }] });
+    expect(el.querySelectorAll('svg path').length).toBe(2);
+    chart.destroy();
+  });
+});
+
+describe('WaterfallChart smoke', () => {
+  it('renders delta bars, a total bar, and connectors at running levels', () => {
+    const el = host();
+    const chart = new WaterfallChart(el, {
+      data: { labels: ['Start', 'Up', 'Down'], series: [{ id: 'w', data: [50, 20, -30] }] },
+      total: 'Net',
+    });
+    const rects = [...el.querySelectorAll('svg rect')];
+    expect(rects.length).toBe(4); // 3 deltas + total
+    const connectors = el.querySelectorAll(
+      'svg line[stroke-dasharray]:not(.nova-crosshair)',
+    );
+    expect(connectors.length).toBe(3);
+    // Net = 40: total bar height equals the |50+20-30| span.
+    const heights = rects.map((r) => Number(r.getAttribute('height')));
+    const startH = heights[0]!;
+    const totalH = heights[3]!;
+    expect(totalH).toBeCloseTo(startH * (40 / 50), 1);
     chart.destroy();
   });
 });

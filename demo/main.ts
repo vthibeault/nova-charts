@@ -6,6 +6,9 @@ import { mountScatterDemo } from './demos/scatter.js';
 import { mountRadarDemo } from './demos/radar.js';
 import { mountGaugeDemo } from './demos/gauge.js';
 import { mountHeatmapDemo } from './demos/heatmap.js';
+import { mountPolarDemo } from './demos/polar.js';
+import { mountFunnelDemo } from './demos/funnel.js';
+import { mountWaterfallDemo } from './demos/waterfall.js';
 import { mountStressDemo } from './demos/stress.js';
 
 type DemoMount = (host: HTMLElement) => () => void;
@@ -19,6 +22,9 @@ const demos: { id: string; name: string; mount: DemoMount }[] = [
   { id: 'radar', name: 'Radar', mount: mountRadarDemo },
   { id: 'gauge', name: 'Gauge', mount: mountGaugeDemo },
   { id: 'heatmap', name: 'Heatmap', mount: mountHeatmapDemo },
+  { id: 'polar', name: 'Polar area', mount: mountPolarDemo },
+  { id: 'funnel', name: 'Funnel', mount: mountFunnelDemo },
+  { id: 'waterfall', name: 'Waterfall', mount: mountWaterfallDemo },
   { id: 'stress', name: 'Stress test', mount: mountStressDemo },
 ];
 

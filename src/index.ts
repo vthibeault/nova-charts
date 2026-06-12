@@ -6,6 +6,9 @@ export { DonutChart, type DonutChartOptions } from './chart/donut.js';
 export { RadarChart, type RadarChartOptions } from './chart/radar.js';
 export { GaugeChart, type GaugeChartOptions } from './chart/gauge.js';
 export { HeatmapChart, type HeatmapChartOptions } from './chart/heatmap.js';
+export { PolarAreaChart, type PolarAreaChartOptions } from './chart/polar.js';
+export { FunnelChart, type FunnelChartOptions } from './chart/funnel.js';
+export { WaterfallChart, type WaterfallChartOptions } from './chart/waterfall.js';
 
 export { Chart } from './core/chart.js';
 export type {
