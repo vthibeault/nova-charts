@@ -9,7 +9,7 @@ import { Tooltip } from '../component/tooltip.js';
 import { Legend } from '../component/legend.js';
 import { PointerTracker, type PointerPos } from '../interaction/pointer.js';
 import { paletteVar, resolveColor } from '../theme/theme.js';
-import { fmtValue, fmtLabel } from '../core/format.js';
+import { fmtValue, fmtLabel, datumValue } from '../core/format.js';
 
 export interface DonutChartOptions extends BaseChartOptions {
   /** Inner radius as a fraction of the outer radius; 0 makes a pie. */
@@ -96,7 +96,7 @@ export class DonutChart extends Chart<DonutChartOptions> {
       return {
         key: label,
         label,
-        value: Math.max(typeof d === 'number' ? d : d.y, 0),
+        value: Math.max(datumValue(d), 0),
         color: paletteVar(i),
       };
     });

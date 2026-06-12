@@ -10,6 +10,8 @@ import { HeatmapChart } from './heatmap.js';
 import { PolarAreaChart } from './polar.js';
 import { FunnelChart } from './funnel.js';
 import { WaterfallChart } from './waterfall.js';
+import { CandlestickChart } from './candlestick.js';
+import { GanttChart } from './gantt.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -159,6 +161,82 @@ describe('FunnelChart smoke', () => {
     expect(texts.some((t) => t?.includes('50%'))).toBe(true);
     chart.setData({ labels: ['Top', 'Low'], series: [{ id: 'f', data: [80, 20] }] });
     expect(el.querySelectorAll('svg path').length).toBe(2);
+    chart.destroy();
+  });
+});
+
+describe('CandlestickChart smoke', () => {
+  it('renders body + wick per candle with up/down colors', () => {
+    const el = host();
+    const chart = new CandlestickChart(el, {
+      data: {
+        labels: ['d1', 'd2'],
+        series: [
+          {
+            id: 'p',
+            data: [
+              { o: 10, h: 15, l: 8, c: 14 }, // up
+              { o: 14, h: 16, l: 9, c: 10 }, // down
+            ],
+          },
+        ],
+      },
+      upColor: '#00ff00',
+      downColor: '#ff0000',
+    });
+    const bodies = [...el.querySelectorAll('svg rect')];
+    expect(bodies.length).toBe(2);
+    expect(bodies[0]!.getAttribute('fill')).toBe('#00ff00');
+    expect(bodies[1]!.getAttribute('fill')).toBe('#ff0000');
+    const wicks = el.querySelectorAll('svg .nova-candle line');
+    expect(wicks.length).toBe(2);
+    // Body spans open..close; wick spans high..low (taller or equal).
+    const bodyH = Number(bodies[0]!.getAttribute('height'));
+    const wick = wicks[0]!;
+    const wickH = Math.abs(Number(wick.getAttribute('y2')) - Number(wick.getAttribute('y1')));
+    expect(wickH).toBeGreaterThan(bodyH);
+    chart.setData({
+      labels: ['d1'],
+      series: [{ id: 'p', data: [{ o: 5, h: 6, l: 4, c: 5.5 }] }],
+    });
+    expect(el.querySelectorAll('svg rect').length).toBe(1);
+    chart.destroy();
+  });
+});
+
+describe('GanttChart smoke', () => {
+  const day = 86_400_000;
+  const t0 = new Date(2026, 0, 5).getTime();
+  const tasks = () => [
+    { id: 'a', name: 'Alpha', start: t0, end: t0 + 3 * day, progress: 0.5 },
+    { id: 'b', name: 'Beta', start: t0 + 2 * day, end: t0 + 6 * day, dependsOn: ['a'] },
+  ];
+
+  it('renders task bars, progress overlays, labels, and connectors', () => {
+    const el = host();
+    const chart = new GanttChart(el, { tasks: tasks(), margin: { left: 80 } });
+    // 2 bars + 2 progress overlays
+    expect(el.querySelectorAll('svg rect').length).toBe(4);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('Alpha');
+    expect(texts).toContain('Beta');
+    // One dependency connector
+    expect(el.querySelectorAll('svg path[stroke-dasharray]').length).toBe(1);
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('setTasks reschedules and progress overlay width follows', () => {
+    const el = host();
+    const chart = new GanttChart(el, { tasks: tasks(), margin: { left: 80 } });
+    const overlayBefore = Number(
+      el.querySelectorAll('svg rect')[1]!.getAttribute('width'),
+    );
+    chart.setTasks(tasks().map((t) => ({ ...t, progress: 1 })));
+    const overlayAfter = Number(
+      el.querySelectorAll('svg rect')[1]!.getAttribute('width'),
+    );
+    expect(overlayAfter).toBeGreaterThan(overlayBefore);
     chart.destroy();
   });
 });

@@ -9,10 +9,19 @@ export interface Point {
   r?: number;
 }
 
+/** Open/high/low/close datum for candlestick charts. */
+export interface OHLC {
+  x?: number | Date | string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+}
+
 export interface Series {
   id: string;
   name?: string;
-  data: number[] | Point[];
+  data: number[] | Point[] | OHLC[];
   color?: string;
 }
 

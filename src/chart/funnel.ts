@@ -6,7 +6,7 @@ import { AnimatedValue, AnimatedVec } from '../motion/animated.js';
 import { Tooltip } from '../component/tooltip.js';
 import { PointerTracker, type PointerPos } from '../interaction/pointer.js';
 import { paletteVar, resolveColor } from '../theme/theme.js';
-import { fmtValue, fmtLabel } from '../core/format.js';
+import { fmtValue, fmtLabel, datumValue } from '../core/format.js';
 
 export interface FunnelChartOptions extends BaseChartOptions {
   /** Vertical gap between stages in px (default 4). */
@@ -73,7 +73,7 @@ export class FunnelChart extends Chart<FunnelChartOptions> {
       return {
         key: label,
         label,
-        value: Math.max(typeof d === 'number' ? d : d.y, 0),
+        value: Math.max(datumValue(d), 0),
         color: paletteVar(i),
       };
     });

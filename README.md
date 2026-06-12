@@ -14,7 +14,7 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart`
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart`
 
 ## Quick start
 
@@ -134,6 +134,32 @@ new WaterfallChart(el, {
   data: { labels: ['Start', 'Sales', 'Costs'], series: [{ id: 'pnl', data: [50, 30, -20] }] },
   total: 'Net',                            // appended, computed total bar
 });
+```
+
+### Candlestick, gantt
+
+```ts
+import { CandlestickChart, GanttChart } from 'nova-charts';
+
+new CandlestickChart(el, {
+  data: {
+    labels: ['Mon', 'Tue'],
+    series: [{
+      id: 'price',
+      data: [{ o: 102, h: 109, l: 99, c: 107 }, { o: 107, h: 111, l: 104, c: 105 }],
+    }],
+  },
+});
+
+const gantt = new GanttChart(el, {
+  tasks: [
+    { id: 'design', name: 'Design', start: new Date(2026, 5, 1), end: new Date(2026, 5, 6), progress: 1 },
+    { id: 'build', name: 'Build', start: new Date(2026, 5, 4), end: new Date(2026, 5, 14), progress: 0.4, dependsOn: ['design'] },
+  ],
+  marker: { value: new Date() },           // "today" line
+  margin: { left: 90 },
+});
+gantt.setTasks(nextPlan);                  // bars, progress, and connectors all glide
 ```
 
 ## Tuning the motion

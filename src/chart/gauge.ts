@@ -6,7 +6,7 @@ import { runTween } from '../motion/tween.js';
 import { buildArcPath } from '../shape/arc.js';
 import { parseColor, vecToRgba } from '../interpolate/color.js';
 import { resolveColor, paletteVar } from '../theme/theme.js';
-import { fmtValue } from '../core/format.js';
+import { fmtValue, datumValue } from '../core/format.js';
 import { clamp } from '../interpolate/number.js';
 
 export interface GaugeChartOptions extends BaseChartOptions {
@@ -104,7 +104,7 @@ export class GaugeChart extends Chart<GaugeChartOptions> {
 
   get value(): number {
     const d = this.options.data.series[0]?.data[0];
-    return d === undefined ? 0 : typeof d === 'number' ? d : d.y;
+    return d === undefined ? 0 : datumValue(d);
   }
 
   protected override chartType(): string {

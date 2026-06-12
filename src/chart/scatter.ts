@@ -49,11 +49,13 @@ export class ScatterChart extends XYChart<ScatterChartOptions> {
   }
 
   private pointsOf(series: Series): { x: number; y: number; r?: number }[] {
-    return series.data.map((d, i) =>
-      typeof d === 'number'
-        ? { x: i, y: d }
-        : { x: this.numericX(d), y: d.y, ...(d.r !== undefined ? { r: d.r } : {}) },
-    );
+    return series.data.map((d, i) => {
+      if (typeof d === 'number') return { x: i, y: d };
+      if ('y' in d) {
+        return { x: this.numericX(d), y: d.y, ...(d.r !== undefined ? { r: d.r } : {}) };
+      }
+      return { x: i, y: d.c }; // OHLC data: plot the close
+    });
   }
 
   private numericX(p: Point): number {

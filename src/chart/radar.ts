@@ -10,7 +10,7 @@ import { Tooltip } from '../component/tooltip.js';
 import { Legend } from '../component/legend.js';
 import { PointerTracker, type PointerPos } from '../interaction/pointer.js';
 import { paletteVar, resolveColor } from '../theme/theme.js';
-import { fmtValue, fmtLabel } from '../core/format.js';
+import { fmtValue, fmtLabel, datumValue } from '../core/format.js';
 import { niceDomain } from '../scale/ticks.js';
 
 export interface RadarChartOptions extends BaseChartOptions {
@@ -115,7 +115,7 @@ export class RadarChart extends Chart<RadarChartOptions> {
   private valuesOf(series: Series, n: number): number[] {
     return Array.from({ length: n }, (_, i) => {
       const d = series.data[i];
-      return d === undefined ? 0 : Math.max(typeof d === 'number' ? d : d.y, 0);
+      return d === undefined ? 0 : Math.max(datumValue(d), 0);
     });
   }
 
