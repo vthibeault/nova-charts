@@ -3,6 +3,9 @@ export { AreaChart, type AreaChartOptions } from './chart/area.js';
 export { BarChart, type BarChartOptions } from './chart/bar.js';
 export { ScatterChart, type ScatterChartOptions } from './chart/scatter.js';
 export { DonutChart, type DonutChartOptions } from './chart/donut.js';
+export { RadarChart, type RadarChartOptions } from './chart/radar.js';
+export { GaugeChart, type GaugeChartOptions } from './chart/gauge.js';
+export { HeatmapChart, type HeatmapChartOptions } from './chart/heatmap.js';
 
 export { Chart } from './core/chart.js';
 export type {

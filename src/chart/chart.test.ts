@@ -4,6 +4,9 @@ import { AreaChart } from './area.js';
 import { BarChart } from './bar.js';
 import { ScatterChart } from './scatter.js';
 import { DonutChart } from './donut.js';
+import { RadarChart } from './radar.js';
+import { GaugeChart } from './gauge.js';
+import { HeatmapChart } from './heatmap.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -125,6 +128,92 @@ describe('BarChart smoke', () => {
     chart.toggleSeries('s2');
     const widthAfter = Number(el.querySelector('svg rect')!.getAttribute('width'));
     expect(widthAfter).toBeGreaterThan(widthBefore);
+    chart.destroy();
+  });
+
+  it('stacked mode piles series and widens bars to the full band', () => {
+    const el = host();
+    const chart = new BarChart(el, { data: data() });
+    const groupedW = Number(el.querySelector('svg rect')!.getAttribute('width'));
+    chart.setOptions({ stacked: true });
+    const rects = [...el.querySelectorAll('svg rect')];
+    const stackedW = Number(rects[0]!.getAttribute('width'));
+    expect(stackedW).toBeGreaterThan(groupedW);
+    // Same column, two series: segments must not overlap (s2 sits on s1).
+    const col0 = rects.filter((r) => r.getAttribute('x') === rects[0]!.getAttribute('x'));
+    expect(col0.length).toBe(2);
+    const tops = col0.map((r) => Number(r.getAttribute('y')));
+    const heights = col0.map((r) => Number(r.getAttribute('height')));
+    const lower = tops[0]! > tops[1]! ? 0 : 1;
+    expect(tops[1 - lower]! + heights[1 - lower]!).toBeCloseTo(tops[lower]!, 3);
+    chart.destroy();
+  });
+});
+
+describe('RadarChart smoke', () => {
+  const radarData = () => ({
+    labels: ['A', 'B', 'C', 'D'],
+    series: [
+      { id: 'r1', name: 'One', data: [10, 20, 30, 40] },
+      { id: 'r2', name: 'Two', data: [40, 30, 20, 10] },
+    ],
+  });
+
+  it('renders one closed polygon per series plus spokes', () => {
+    const el = host();
+    const chart = new RadarChart(el, { data: radarData() });
+    const polys = [...el.querySelectorAll('svg path')].filter((p) =>
+      p.getAttribute('d')?.endsWith('Z'),
+    );
+    // 2 series polygons + 4 grid rings (all closed)
+    expect(polys.length).toBe(6);
+    expect(el.querySelectorAll('svg line').length).toBe(4); // spokes
+    chart.setData({ labels: ['A', 'B', 'C'], series: [{ id: 'r1', data: [1, 2, 3] }] });
+    expect(el.querySelectorAll('svg line').length).toBe(3);
+    chart.destroy();
+  });
+});
+
+describe('GaugeChart smoke', () => {
+  it('renders track, value arc, and formatted readout', () => {
+    const el = host();
+    const chart = new GaugeChart(el, {
+      data: { series: [{ id: 'v', name: 'CPU', data: [42] }] },
+      max: 100,
+      format: (v) => `${Math.round(v)}%`,
+    });
+    expect(el.querySelectorAll('svg path').length).toBe(2);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('42%');
+    expect(texts).toContain('CPU');
+    chart.setValue(80);
+    expect([...el.querySelectorAll('svg text')].map((t) => t.textContent)).toContain('80%');
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+});
+
+describe('HeatmapChart smoke', () => {
+  it('renders rows × columns cells with ramped colors', () => {
+    const el = host();
+    const chart = new HeatmapChart(el, {
+      data: {
+        labels: ['c1', 'c2', 'c3'],
+        series: [
+          { id: 'r1', name: 'Row 1', data: [0, 50, 100] },
+          { id: 'r2', name: 'Row 2', data: [100, 50, 0] },
+        ],
+      },
+      colorRange: ['#000000', '#ffffff'],
+    });
+    const rects = [...el.querySelectorAll('svg rect')];
+    expect(rects.length).toBe(6);
+    const fills = rects.map((r) => r.getAttribute('fill'));
+    expect(fills).toContain('rgb(0, 0, 0)');
+    expect(fills).toContain('rgb(255, 255, 255)');
+    expect(fills).toContain('rgb(128, 128, 128)');
+    chart.setData({ labels: ['c1'], series: [{ id: 'r1', data: [5] }] });
+    expect(el.querySelectorAll('svg rect').length).toBe(1);
     chart.destroy();
   });
 });

@@ -7,12 +7,15 @@ import { AnimatedValue, AnimatedVec } from '../motion/animated.js';
 import { stagger } from '../motion/stagger.js';
 import { scaleLinear, type LinearScale } from '../scale/linear.js';
 import { scaleBand, type BandScale } from '../scale/band.js';
+import { niceDomain } from '../scale/ticks.js';
 import { fmtValue } from '../core/format.js';
 import type { PointerPos } from '../interaction/pointer.js';
 
 export interface BarChartOptions extends BaseChartOptions {
   /** Corner radius for bars (default 3). */
   cornerRadius?: number;
+  /** Stack series on top of each other instead of grouping side by side. */
+  stacked?: boolean;
 }
 
 interface BarItem extends JoinItem {
@@ -52,8 +55,35 @@ export class BarChart extends XYChart<BarChartOptions> {
     const n = labels.length;
     const immediate = this.immediate() || reason === 'resize';
     const spring = this.springConfig();
+    const stacked = this.options.stacked === true;
+    const visible = this.visibleSeries();
 
-    const [d0, d1] = this.yDomain(true);
+    // Stacking offsets: positives pile up, negatives pile down, per column.
+    const offsets: number[][] = [];
+    let d0: number;
+    let d1: number;
+    if (stacked) {
+      const cumPos = new Array<number>(n).fill(0);
+      const cumNeg = new Array<number>(n).fill(0);
+      visible.forEach((s, si) => {
+        offsets[si] = this.valuesOf(s).map((v, i) => {
+          if (i >= n) return 0;
+          if (v >= 0) {
+            const y0 = cumPos[i]!;
+            cumPos[i] = y0 + v;
+            return y0;
+          }
+          const y0 = cumNeg[i]!;
+          cumNeg[i] = y0 + v;
+          return y0;
+        });
+      });
+      const hi = Math.max(0, ...cumPos);
+      const lo = Math.min(0, ...cumNeg);
+      [d0, d1] = niceDomain(lo, hi === lo ? lo + 1 : hi, this.options.axes?.y?.ticks ?? 5);
+    } else {
+      [d0, d1] = this.yDomain(true);
+    }
     this.yScale = scaleLinear({
       domain: [d0, d1],
       range: [this.plot.y + this.plot.height, this.plot.y],
@@ -90,11 +120,10 @@ export class BarChart extends XYChart<BarChartOptions> {
     }
     this.updateLegend();
 
-    const visible = this.visibleSeries();
     const m = Math.max(visible.length, 1);
     const groupW = this.band.bandwidth();
     const gap = Math.min(groupW * 0.04, 2);
-    const barW = Math.max((groupW - gap * (m - 1)) / m, 1);
+    const barW = stacked ? groupW : Math.max((groupW - gap * (m - 1)) / m, 1);
     const baselineY = this.yScale(Math.max(Math.min(0, d1), d0));
     const rx = Math.min(this.options.cornerRadius ?? 3, barW / 2);
 
@@ -108,6 +137,12 @@ export class BarChart extends XYChart<BarChartOptions> {
     });
 
     const geom = (si: number, i: number, value: number): [number, number, number, number] => {
+      if (stacked) {
+        const y0 = offsets[si]?.[i] ?? 0;
+        const a = this.yScale(y0);
+        const b = this.yScale(y0 + value);
+        return [this.band(i), Math.min(a, b), barW, Math.abs(a - b)];
+      }
       const x = this.band(i) + si * (barW + gap);
       const vy = this.yScale(value);
       const y = Math.min(vy, baselineY);
