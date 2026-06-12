@@ -8,6 +8,8 @@ import { runTween } from '../motion/tween.js';
 import { easeInOutCubic } from '../motion/easing.js';
 import { stagger } from '../motion/stagger.js';
 import { scaleLinear, type LinearScale } from '../scale/linear.js';
+import { niceDomain } from '../scale/ticks.js';
+import type { Series } from '../core/types.js';
 import { buildLinePath } from '../shape/line.js';
 import { buildAreaPath } from '../shape/area.js';
 import { resamplePolyline } from '../interpolate/resample.js';
@@ -20,6 +22,8 @@ export interface LineChartOptions extends BaseChartOptions {
   curve?: CurveType;
   /** Render dots at each data point (default true). */
   showPoints?: boolean;
+  /** Stack series (area charts): bands pile on top of each other. */
+  stacked?: boolean;
 }
 
 interface Dot {
@@ -40,6 +44,8 @@ interface SeriesItem extends JoinItem {
   colorSpec: string;
   colorResolved: string;
   values: number[];
+  /** Pixel-space source values (cumulative tops when stacked). */
+  geomVals: number[];
   pendingSnap: Float64Array | null;
   cancelDraw: (() => void) | null;
   removeFn: (() => void) | null;
@@ -96,8 +102,33 @@ export class LineChart extends XYChart<LineChartOptions> {
     const n = labels.length;
     const immediate = this.immediate() || reason === 'init' || reason === 'resize';
     const spring = this.springConfig();
+    const visible = this.visibleSeries();
+    const stacked = this.filled && this.options.stacked === true;
 
-    const [d0, d1] = this.yDomain(this.includeZero());
+    // Stacking: each band's geometry follows the cumulative top (negatives
+    // are clamped — stacked areas are sums of magnitudes).
+    const tops = new Map<string, number[]>();
+    let d0: number;
+    let d1: number;
+    if (stacked) {
+      const cum = new Array<number>(n).fill(0);
+      for (const s of visible) {
+        const values = this.valuesOf(s);
+        tops.set(
+          s.id,
+          Array.from({ length: n }, (_, i) => {
+            cum[i] = cum[i]! + Math.max(values[i] ?? 0, 0);
+            return cum[i]!;
+          }),
+        );
+      }
+      [d0, d1] = niceDomain(0, Math.max(...cum, 1), this.options.axes?.y?.ticks ?? 5);
+    } else {
+      [d0, d1] = this.yDomain(this.includeZero());
+    }
+    const geomValues = (s: Series): number[] => tops.get(s.id) ?? this.valuesOf(s);
+    const fillOpacity = stacked ? 0.85 : 0.18;
+
     this.yScale = scaleLinear({
       domain: [d0, d1],
       range: [this.plot.y + this.plot.height, this.plot.y],
@@ -135,7 +166,6 @@ export class LineChart extends XYChart<LineChartOptions> {
     this.updateLegend();
 
     const baselineY = this.yScale(clamp(0, Math.min(d0, d1), Math.max(d0, d1)));
-    const visible = this.visibleSeries();
 
     keyedJoin(
       this.items,
@@ -143,14 +173,14 @@ export class LineChart extends XYChart<LineChartOptions> {
       {
         enter: (_key, s, si) => {
           const values = this.valuesOf(s);
-          const pts = this.targetPoints(values);
+          const pts = this.targetPoints(geomValues(s));
           const { spec, resolved } = this.colorOf(s, si);
           const g = svgEl('g', {}, this.seriesLayer);
           let fill: SVGPathElement | null = null;
           if (this.filled) {
             fill = svgEl(
               'path',
-              { fill: spec, 'fill-opacity': 0.18, stroke: 'none' },
+              { fill: spec, 'fill-opacity': fillOpacity, stroke: 'none' },
               g,
             );
           }
@@ -179,6 +209,7 @@ export class LineChart extends XYChart<LineChartOptions> {
             colorSpec: spec,
             colorResolved: resolved,
             values,
+            geomVals: geomValues(s),
             pendingSnap: null,
             cancelDraw: null,
             removeFn: null,
@@ -211,7 +242,7 @@ export class LineChart extends XYChart<LineChartOptions> {
           this.syncDots(item, pts, true);
           if (!this.immediate()) {
             if (!this.entranceDone) {
-              this.playEntrance(item, si);
+              this.playEntrance(item, si, fillOpacity);
             } else {
               // Series appearing later (new id, legend re-show): fade in.
               item.opacity.set(0, { immediate: true });
@@ -223,6 +254,7 @@ export class LineChart extends XYChart<LineChartOptions> {
         update: (item, s, si) => {
           const values = this.valuesOf(s);
           item.values = values;
+          item.geomVals = geomValues(s);
           const { spec, resolved } = this.colorOf(s, si);
           if (spec !== item.colorSpec) {
             item.colorSpec = spec;
@@ -231,9 +263,10 @@ export class LineChart extends XYChart<LineChartOptions> {
             item.fill?.setAttribute('fill', spec);
             for (const d of item.dots) d.c.setAttribute('fill', spec);
           }
+          item.fill?.setAttribute('fill-opacity', String(fillOpacity));
           item.opacity.set(1, { immediate });
           item.baseline.set(baselineY, { immediate });
-          this.morphTo(item, this.targetPoints(values), immediate);
+          this.morphTo(item, this.targetPoints(geomValues(s)), immediate);
         },
         exit: (item, remove) => {
           item.removeFn = remove;
@@ -248,6 +281,14 @@ export class LineChart extends XYChart<LineChartOptions> {
         },
       },
     );
+    // Stacked bands overdraw from largest (last series) to smallest, so each
+    // band stays visible above the one below it.
+    if (stacked) {
+      for (let i = visible.length - 1; i >= 0; i--) {
+        const item = this.items.get(visible[i]!.id);
+        if (item) this.seriesLayer.appendChild(item.g);
+      }
+    }
     this.entranceDone = true;
     this.refreshHover();
   }
@@ -349,7 +390,7 @@ export class LineChart extends XYChart<LineChartOptions> {
   }
 
   /** Entrance: stroke draw-in (with per-series stagger) + dot pops. */
-  private playEntrance(item: SeriesItem, seriesIndex: number): void {
+  private playEntrance(item: SeriesItem, seriesIndex: number, fillOpacity = 0.18): void {
     const duration = this.enterDuration();
     const delay = seriesIndex * Math.max(this.enterStagger() * 3, 100);
     let length = 0;
@@ -375,7 +416,7 @@ export class LineChart extends XYChart<LineChartOptions> {
       const fill = item.fill;
       fill.setAttribute('fill-opacity', '0');
       runTween(
-        { from: 0, to: 0.18, duration: duration * 0.8, delay: delay + duration * 0.3 },
+        { from: 0, to: fillOpacity, duration: duration * 0.8, delay: delay + duration * 0.3 },
         (v) => fill.setAttribute('fill-opacity', String(v)),
       );
     }
@@ -418,7 +459,7 @@ export class LineChart extends XYChart<LineChartOptions> {
         label: labels[index] ?? String(index),
         color: item.colorResolved,
         x: this.xPositions[index]!,
-        y: this.yScale(item.values[index]!),
+        y: this.yScale(item.geomVals[index] ?? item.values[index]!),
       });
     }
     if (points.length === 0) {

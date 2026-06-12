@@ -14,7 +14,7 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart`
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart`
 
 ## Quick start
 
@@ -111,6 +111,28 @@ new HeatmapChart(el, {
     ],
   },
   colorRange: ['#312e81', '#22d3ee'],
+});
+```
+
+### Polar area, funnel, waterfall
+
+```ts
+import { PolarAreaChart, FunnelChart, WaterfallChart } from 'nova-charts';
+
+new PolarAreaChart(el, {
+  data: { labels: ['N', 'E', 'S', 'W'], series: [{ id: 'wind', data: [40, 70, 25, 55] }] },
+});
+
+new FunnelChart(el, {
+  data: {
+    labels: ['Visited', 'Signed up', 'Subscribed'],
+    series: [{ id: 'conv', data: [1000, 420, 180] }],
+  },
+});
+
+new WaterfallChart(el, {
+  data: { labels: ['Start', 'Sales', 'Costs'], series: [{ id: 'pnl', data: [50, 30, -20] }] },
+  total: 'Net',                            // appended, computed total bar
 });
 ```
 

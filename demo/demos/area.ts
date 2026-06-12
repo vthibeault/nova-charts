@@ -29,6 +29,11 @@ export function mountAreaDemo(host: HTMLElement): () => void {
     chart.setData(data());
   });
   controls.button('Toggle “Signups”', () => chart.toggleSeries('signups'));
+  let stacked = false;
+  controls.button('Stacked ⇄ overlap', () => {
+    stacked = !stacked;
+    chart.setOptions({ stacked });
+  });
   const live = liveMode(() => chart.setData(data()));
   controls.checkbox('Live mode', (on) => live.set(on));
 
