@@ -37,6 +37,11 @@ export function mountBarDemo(host: HTMLElement): () => void {
     grouped = !grouped;
     chart.setData(data());
   });
+  let stacked = false;
+  controls.button('Stacked ⇄ grouped', () => {
+    stacked = !stacked;
+    chart.setOptions({ stacked });
+  });
   controls.button('Toggle “Retail”', () => chart.toggleSeries('retail'));
   const live = liveMode(() => chart.setData(data()));
   controls.checkbox('Live mode', (on) => live.set(on));

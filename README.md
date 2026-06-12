@@ -14,7 +14,7 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` · `BarChart` (grouped) · `DonutChart` (or pie) · `ScatterChart` (or bubble)
+`LineChart` · `AreaChart` · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart`
 
 ## Quick start
 
@@ -58,6 +58,7 @@ new BarChart(el, {
       { id: 'retail', name: 'Retail', data: [34, 29, 41] },
     ],
   },
+  stacked: false,  // flip at runtime with setOptions({ stacked: true }) — bars morph between layouts
 });
 
 new DonutChart(el, {
@@ -73,6 +74,43 @@ new ScatterChart(el, {
       data: [{ x: 12, y: 34, r: 8 }, { x: 45, y: 61, r: 22 }],  // r = bubble size
     }],
   },
+});
+```
+
+### Radar, gauge, heatmap
+
+```ts
+import { RadarChart, GaugeChart, HeatmapChart } from 'nova-charts';
+
+new RadarChart(el, {
+  data: {
+    labels: ['Speed', 'Power', 'Range', 'Comfort', 'Style'],
+    series: [{ id: 'a', name: 'Nova GT', data: [80, 65, 90, 70, 85] }],
+  },
+  max: 100,
+});
+
+const gauge = new GaugeChart(el, {
+  data: { series: [{ id: 'cpu', name: 'CPU LOAD', data: [42] }] },
+  min: 0, max: 100,
+  format: (v) => `${Math.round(v)}%`,
+  colorStops: [           // the arc's color springs through rgba space across stops
+    { until: 50, color: 'var(--nova-c4)' },
+    { until: 80, color: 'var(--nova-c5)' },
+    { until: 100, color: 'var(--nova-c7)' },
+  ],
+});
+gauge.setValue(87);        // arc sweeps, color shifts, number counts
+
+new HeatmapChart(el, {
+  data: {
+    labels: ['6am', '12pm', '6pm'],        // columns
+    series: [                              // rows
+      { id: 'mon', name: 'Mon', data: [12, 80, 44] },
+      { id: 'tue', name: 'Tue', data: [25, 64, 71] },
+    ],
+  },
+  colorRange: ['#312e81', '#22d3ee'],
 });
 ```
 
