@@ -11,6 +11,14 @@ export { FunnelChart, type FunnelChartOptions } from './chart/funnel.js';
 export { WaterfallChart, type WaterfallChartOptions } from './chart/waterfall.js';
 export { CandlestickChart, type CandlestickChartOptions } from './chart/candlestick.js';
 export { GanttChart, type GanttChartOptions, type GanttTask } from './chart/gantt.js';
+export { TreemapChart, type TreemapChartOptions } from './chart/treemap.js';
+export { BoxPlotChart, type BoxPlotChartOptions } from './chart/boxplot.js';
+export {
+  SankeyChart,
+  type SankeyChartOptions,
+  type SankeyLink,
+  type SankeyNode,
+} from './chart/sankey.js';
 
 export { Chart } from './core/chart.js';
 export type {
