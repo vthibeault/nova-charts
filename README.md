@@ -14,7 +14,7 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart`
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · `TreemapChart` · `BoxPlotChart` · `SankeyChart`
 
 ## Quick start
 
@@ -160,6 +160,34 @@ const gantt = new GanttChart(el, {
   margin: { left: 90 },
 });
 gantt.setTasks(nextPlan);                  // bars, progress, and connectors all glide
+```
+
+### Treemap, box plot, sankey
+
+```ts
+import { TreemapChart, BoxPlotChart, SankeyChart } from 'nova-charts';
+
+new TreemapChart(el, {
+  data: { labels: ['Search', 'Video', 'Mail'], series: [{ id: 'usage', data: [55, 30, 15] }] },
+});
+
+new BoxPlotChart(el, {
+  data: {
+    series: [                              // each series = one category of raw samples
+      { id: 'alpha', name: 'Alpha', data: [4, 8, 15, 16, 23, 42] },
+      { id: 'bravo', name: 'Bravo', data: [7, 9, 13, 18, 21, 60] },
+    ],
+  },
+});
+
+const sankey = new SankeyChart(el, {
+  nodes: [{ id: 'ads' }, { id: 'visit', name: 'Visits' }, { id: 'signup', name: 'Signups' }],
+  links: [
+    { source: 'ads', target: 'visit', value: 120 },
+    { source: 'visit', target: 'signup', value: 45 },
+  ],
+});
+sankey.setFlows(nodes, nextLinks);         // ribbons thicken, thin, and slide
 ```
 
 ## Tuning the motion

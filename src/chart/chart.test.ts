@@ -12,6 +12,9 @@ import { FunnelChart } from './funnel.js';
 import { WaterfallChart } from './waterfall.js';
 import { CandlestickChart } from './candlestick.js';
 import { GanttChart } from './gantt.js';
+import { TreemapChart } from './treemap.js';
+import { BoxPlotChart } from './boxplot.js';
+import { SankeyChart } from './sankey.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -238,6 +241,78 @@ describe('GanttChart smoke', () => {
     );
     expect(overlayAfter).toBeGreaterThan(overlayBefore);
     chart.destroy();
+  });
+});
+
+describe('TreemapChart smoke', () => {
+  it('renders one cell per value, tiling the plot area by share', () => {
+    const el = host();
+    const chart = new TreemapChart(el, {
+      data: { labels: ['A', 'B', 'C'], series: [{ id: 't', data: [60, 30, 10] }] },
+    });
+    const rects = [...el.querySelectorAll('svg rect')];
+    expect(rects.length).toBe(3);
+    const areas = rects.map(
+      (r) => Number(r.getAttribute('width')) * Number(r.getAttribute('height')),
+    );
+    // Larger values get larger cells, roughly proportional.
+    expect(areas[0]!).toBeGreaterThan(areas[1]!);
+    expect(areas[1]!).toBeGreaterThan(areas[2]!);
+    chart.setData({ labels: ['A'], series: [{ id: 't', data: [5] }] });
+    expect(el.querySelectorAll('svg rect').length).toBe(1);
+    chart.destroy();
+  });
+});
+
+describe('BoxPlotChart smoke', () => {
+  it('renders box, whiskers, median, and outlier dots per category', () => {
+    const el = host();
+    const chart = new BoxPlotChart(el, {
+      data: {
+        series: [
+          // 1..9 plus a wild outlier
+          { id: 'a', name: 'A', data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 50] },
+          { id: 'b', name: 'B', data: [10, 12, 14, 16, 18] },
+        ],
+      },
+    });
+    expect(el.querySelectorAll('svg .nova-box').length).toBe(2);
+    expect(el.querySelectorAll('svg .nova-box rect').length).toBe(2);
+    // 4 lines per box: whisker + 2 caps + median
+    expect(el.querySelectorAll('svg .nova-box line').length).toBe(8);
+    // The 50 is an outlier dot on category A.
+    expect(el.querySelectorAll('svg .nova-box circle').length).toBe(1);
+    chart.destroy();
+  });
+});
+
+describe('SankeyChart smoke', () => {
+  it('lays out nodes in columns and draws value-weighted ribbons', () => {
+    const el = host();
+    const chart = new SankeyChart(el, {
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      links: [
+        { source: 'a', target: 'b', value: 30 },
+        { source: 'b', target: 'c', value: 10 },
+        { source: 'a', target: 'c', value: 10 },
+      ],
+    });
+    expect(el.querySelectorAll('svg rect').length).toBe(3);
+    const ribbons = [...el.querySelectorAll('svg path')];
+    expect(ribbons.length).toBe(3);
+    const widths = ribbons.map((p) => Number(p.getAttribute('stroke-width')));
+    expect(Math.max(...widths)).toBeGreaterThan(Math.min(...widths)); // 30 vs 10
+    // Columns increase left to right: a < b < c.
+    const xs = [...el.querySelectorAll('svg rect')].map((r) => Number(r.getAttribute('x')));
+    expect(xs[0]!).toBeLessThan(xs[1]!);
+    expect(xs[1]!).toBeLessThan(xs[2]!);
+    chart.setFlows(
+      [{ id: 'a' }, { id: 'b' }],
+      [{ source: 'a', target: 'b', value: 5 }],
+    );
+    expect(el.querySelectorAll('svg path').length).toBe(1);
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
   });
 });
 

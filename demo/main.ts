@@ -11,6 +11,9 @@ import { mountFunnelDemo } from './demos/funnel.js';
 import { mountWaterfallDemo } from './demos/waterfall.js';
 import { mountCandlestickDemo } from './demos/candlestick.js';
 import { mountGanttDemo } from './demos/gantt.js';
+import { mountTreemapDemo } from './demos/treemap.js';
+import { mountBoxPlotDemo } from './demos/boxplot.js';
+import { mountSankeyDemo } from './demos/sankey.js';
 import { mountStressDemo } from './demos/stress.js';
 
 type DemoMount = (host: HTMLElement) => () => void;
@@ -29,6 +32,9 @@ const demos: { id: string; name: string; mount: DemoMount }[] = [
   { id: 'waterfall', name: 'Waterfall', mount: mountWaterfallDemo },
   { id: 'candlestick', name: 'Candlestick', mount: mountCandlestickDemo },
   { id: 'gantt', name: 'Gantt', mount: mountGanttDemo },
+  { id: 'treemap', name: 'Treemap', mount: mountTreemapDemo },
+  { id: 'boxplot', name: 'Box plot', mount: mountBoxPlotDemo },
+  { id: 'sankey', name: 'Sankey', mount: mountSankeyDemo },
   { id: 'stress', name: 'Stress test', mount: mountStressDemo },
 ];
 
