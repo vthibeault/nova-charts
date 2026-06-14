@@ -16,8 +16,8 @@ export interface PolarAreaChartOptions extends BaseChartOptions {
   levels?: number;
   /** Fixed value at the outer ring; defaults to the (niced) data max. */
   max?: number;
-  /** Angular gap between slices, in radians. */
-  padAngle?: number;
+  /** Constant-width gap between petals, in pixels (default 2). */
+  padPx?: number;
 }
 
 interface SliceItem extends JoinItem {
@@ -99,7 +99,9 @@ export class PolarAreaChart extends Chart<PolarAreaChartOptions> {
 
   protected override update(reason: UpdateReason): void {
     const immediate = this.immediate() || reason === 'resize';
-    const spring = this.springConfig();
+    // Petal angles are in radians; tighten the rest threshold so springs
+    // resolve smoothly instead of snapping the last few degrees.
+    const spring = { ...this.springConfig(), restDelta: 0.0012, restSpeed: 0.08 };
     const slices = this.sliceData();
 
     this.cx = this.plot.x + this.plot.width / 2;
@@ -152,7 +154,7 @@ export class PolarAreaChart extends Chart<PolarAreaChartOptions> {
       if (visible) cum += extent;
       return { ...s, start, end: cum, visible };
     });
-    const pad = this.options.padAngle ?? 0.025;
+    const pad = this.options.padPx ?? 2;
     this.baseOuter = new Map(
       layout.map((l) => [l.key, l.visible ? radiusOf(l.value) : 0] as const),
     );
@@ -185,7 +187,7 @@ export class PolarAreaChart extends Chart<PolarAreaChartOptions> {
               endAngle: v[1]!,
               innerRadius: Math.max(v[2]!, 0),
               outerRadius: Math.max(v[3]!, 0),
-              padAngle: pad,
+              padPx: pad,
             }),
           );
         });

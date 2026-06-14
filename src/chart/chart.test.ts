@@ -508,7 +508,11 @@ describe('DonutChart smoke', () => {
     const chart = new DonutChart(el, { data: donutData(), innerRadius: 0 });
     expect(el.querySelector('svg text')).toBeNull();
     const d = el.querySelector('svg path')!.getAttribute('d')!;
-    expect(d).toMatch(/^M[\d.]+,[\d.]+L/); // wedge starts at the center
+    // Padded wedge: outer arc, then a line to the near-center apex, closed.
+    expect(d).toMatch(/^M[\d.-]+,[\d.-]+A/);
+    expect(d).toContain('L');
+    expect(d.endsWith('Z')).toBe(true);
+    expect(d).not.toMatch(/NaN/);
     chart.destroy();
   });
 });

@@ -14,8 +14,8 @@ import { fmtValue, fmtLabel, datumValue } from '../core/format.js';
 export interface DonutChartOptions extends BaseChartOptions {
   /** Inner radius as a fraction of the outer radius; 0 makes a pie. */
   innerRadius?: number;
-  /** Angular gap between slices, in radians. */
-  padAngle?: number;
+  /** Constant-width gap between slices, in pixels (default 2). */
+  padPx?: number;
   /** Show the animated total in the center (donut only). */
   centerLabel?: boolean;
 }
@@ -104,7 +104,10 @@ export class DonutChart extends Chart<DonutChartOptions> {
 
   protected override update(reason: UpdateReason): void {
     const immediate = this.immediate() || reason === 'resize';
-    const spring = this.springConfig();
+    // Slices animate in radians, so the default pixel rest threshold (0.05)
+    // would let springs settle ~3° short and snap. Tighten it so the motion
+    // resolves smoothly all the way to the target.
+    const spring = { ...this.springConfig(), restDelta: 0.0012, restSpeed: 0.08 };
     const slices = this.sliceData();
 
     this.cx = this.plot.x + this.plot.width / 2;
@@ -136,7 +139,7 @@ export class DonutChart extends Chart<DonutChartOptions> {
       return { ...s, start, end: cum, visible };
     });
 
-    const pad = this.options.padAngle ?? 0.02;
+    const pad = this.options.padPx ?? 2;
 
     keyedJoin(this.slices, layout.map((l) => [l.key, l] as const), {
       enter: (_key, l, i) => {
@@ -165,7 +168,7 @@ export class DonutChart extends Chart<DonutChartOptions> {
               endAngle: v[1]!,
               innerRadius: Math.max(v[2]!, 0),
               outerRadius: Math.max(v[3]!, 0),
-              padAngle: pad,
+              padPx: pad,
             }),
           );
         });

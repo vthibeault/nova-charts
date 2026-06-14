@@ -112,6 +112,57 @@ describe('buildArcPath', () => {
     expect(d.endsWith('Z')).toBe(true);
   });
 
+  it('padPx gives a constant-width gap (same offset at inner and outer radius)', () => {
+    // cx=cy=0, a0=0 -> the start-edge divider is the vertical line x=0, so the
+    // perpendicular gap offset of any edge point is just |x|.
+    const d = buildArcPath({
+      cx: 0,
+      cy: 0,
+      innerRadius: 40,
+      outerRadius: 80,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
+      padPx: 4,
+    });
+    const outerStart = /^M(-?[\d.]+),/.exec(d)!;
+    const innerStart = /0 (-?[\d.]+),(-?[\d.]+)Z$/.exec(d)!;
+    const outerOffset = Math.abs(Number(outerStart[1]));
+    const innerOffset = Math.abs(Number(innerStart[1]));
+    // Both edges sit half the gap (2px) from the divider, regardless of radius.
+    expect(outerOffset).toBeCloseTo(2, 1);
+    expect(innerOffset).toBeCloseTo(2, 1);
+  });
+
+  it('padPx fades to nothing on slices too narrow to hold the gap', () => {
+    // A sliver far narrower than the requested 8px gap must still render.
+    const d = buildArcPath({
+      cx: 0,
+      cy: 0,
+      innerRadius: 40,
+      outerRadius: 80,
+      startAngle: 0,
+      endAngle: 0.01,
+      padPx: 8,
+    });
+    expect(d).not.toBe('');
+    expect(d).not.toMatch(/NaN/);
+  });
+
+  it('padPx on a pie wedge comes to a clean point with no inner arc', () => {
+    const d = buildArcPath({
+      cx: 0,
+      cy: 0,
+      innerRadius: 0,
+      outerRadius: 80,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
+      padPx: 4,
+    });
+    // Outer arc then a single L to the apex, no inner arc (one 'A' total).
+    expect(d.match(/A/g)!.length).toBe(1);
+    expect(d).not.toMatch(/NaN/);
+  });
+
   it('centroid sits at the angular and radial midpoint', () => {
     const [x, y] = arcCentroid({
       cx: 0,
