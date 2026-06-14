@@ -10,6 +10,12 @@ export interface ArcSpec {
   endAngle: number;
   /** Angular gap (radians) shaved off each side of the slice. */
   padAngle?: number;
+  /**
+   * Constant gap *width in pixels* between adjacent slices. Unlike padAngle,
+   * the gap edges are parallel straight lines (same width at every radius),
+   * and the gap shrinks smoothly to zero on slices too narrow to hold it.
+   */
+  padPx?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -30,13 +36,87 @@ export function buildArcPath(spec: ArcSpec): string {
   let a1 = spec.endAngle;
   if (a1 < a0) [a0, a1] = [a1, a0];
 
+  const extent = a1 - a0;
+  if (extent <= 1e-6) return '';
+
+  // Constant-width gap: offset each edge by a fixed perpendicular distance
+  // from its radial divider, so the gap reads as a straight strip of even
+  // width rather than a wedge. The offset shrinks with the slice so narrow
+  // slices lose the gap gracefully instead of popping.
+  const padPx = spec.padPx ?? 0;
+  if (padPx > 0 && extent < TAU - 1e-6) {
+    return buildPaddedArc(cx, cy, innerRadius, outerRadius, a0, a1, extent, padPx);
+  }
+
+  // Legacy constant-angle pad (kept for callers that opt into it).
   const pad = spec.padAngle ?? 0;
-  if (pad > 0 && a1 - a0 > pad * 2) {
+  if (pad > 0 && extent > pad * 2 && extent < TAU - 1e-6) {
     a0 += pad;
     a1 -= pad;
   }
+  return buildPlainArc(cx, cy, innerRadius, outerRadius, a0, a1, a1 - a0);
+}
 
-  const extent = a1 - a0;
+function buildPaddedArc(
+  cx: number,
+  cy: number,
+  innerRadius: number,
+  outerRadius: number,
+  a0: number,
+  a1: number,
+  extent: number,
+  padPx: number,
+): string {
+  const sinHalf = Math.sin(extent / 2);
+  // Half-gap, clamped so the outer arc never inverts (gap fades on narrow slices).
+  const d = Math.min(padPx / 2, outerRadius * sinHalf * 0.999);
+  if (d <= 1e-4) return buildPlainArc(cx, cy, innerRadius, outerRadius, a0, a1, extent);
+
+  const offOuter = Math.asin(Math.min(d / outerRadius, 1));
+  const oa0 = a0 + offOuter;
+  const oa1 = a1 - offOuter;
+  const largeArc = oa1 - oa0 > Math.PI ? 1 : 0;
+  const [sox, soy] = polar(cx, cy, outerRadius, oa0);
+  const [eox, eoy] = polar(cx, cy, outerRadius, oa1);
+
+  // Radius where the two offset edges meet. Below it there's no room for an
+  // inner arc, so the slice comes to a point (covers pies and thin donuts).
+  const apexRadius = sinHalf > 1e-6 ? d / sinHalf : 0;
+
+  if (innerRadius <= apexRadius + 1e-4) {
+    const mid = (a0 + a1) / 2;
+    const [apx, apy] = polar(cx, cy, Math.max(apexRadius, innerRadius), mid);
+    return (
+      `M${f(sox)},${f(soy)}` +
+      `A${f(outerRadius)},${f(outerRadius)} 0 ${largeArc} 1 ${f(eox)},${f(eoy)}` +
+      `L${f(apx)},${f(apy)}` +
+      'Z'
+    );
+  }
+
+  const offInner = Math.asin(Math.min(d / innerRadius, 1));
+  const ia0 = a0 + offInner;
+  const ia1 = a1 - offInner;
+  const [six, siy] = polar(cx, cy, innerRadius, ia0);
+  const [eix, eiy] = polar(cx, cy, innerRadius, ia1);
+  return (
+    `M${f(sox)},${f(soy)}` +
+    `A${f(outerRadius)},${f(outerRadius)} 0 ${largeArc} 1 ${f(eox)},${f(eoy)}` +
+    `L${f(eix)},${f(eiy)}` +
+    `A${f(innerRadius)},${f(innerRadius)} 0 ${largeArc} 0 ${f(six)},${f(siy)}` +
+    'Z'
+  );
+}
+
+function buildPlainArc(
+  cx: number,
+  cy: number,
+  innerRadius: number,
+  outerRadius: number,
+  a0: number,
+  a1: number,
+  extent: number,
+): string {
   if (extent <= 1e-6) return '';
 
   if (extent >= TAU - 1e-6) {

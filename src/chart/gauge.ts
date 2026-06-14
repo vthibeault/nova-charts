@@ -68,7 +68,14 @@ export class GaugeChart extends Chart<GaugeChartOptions> {
       this.svg,
     );
 
-    this.angle = new AnimatedValue(this.startAngle(), { stiffness: 120, damping: 20 });
+    // Angle is in radians, so use a tighter-than-pixel rest threshold to
+    // avoid a visible terminal snap when the arc settles.
+    this.angle = new AnimatedValue(this.startAngle(), {
+      stiffness: 120,
+      damping: 20,
+      restDelta: 0.0012,
+      restSpeed: 0.08,
+    });
     const initial = parseColor(this.targetColor()) ?? { r: 99, g: 102, b: 241, a: 1 };
     this.color = new AnimatedVec([initial.r, initial.g, initial.b, initial.a], {
       stiffness: 120,
