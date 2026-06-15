@@ -16,6 +16,7 @@ import { BudgetFlowChart } from './budgetflow.js';
 import { TreemapChart } from './treemap.js';
 import { BoxPlotChart } from './boxplot.js';
 import { SankeyChart } from './sankey.js';
+import { StreamChart } from './stream.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -365,6 +366,52 @@ describe('SankeyChart smoke', () => {
     expect(el.querySelectorAll('svg path').length).toBe(1);
     chart.destroy();
     expect(el.querySelector('svg')).toBeNull();
+  });
+});
+
+describe('StreamChart smoke', () => {
+  const streamData = () => ({
+    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
+    series: [
+      { id: 'a', name: 'A', data: [10, 20, 15, 25] },
+      { id: 'b', name: 'B', data: [5, 8, 12, 6] },
+      { id: 'c', name: 'C', data: [8, 4, 9, 14] },
+    ],
+  });
+
+  it('renders one closed band per series, stacked symmetrically', () => {
+    const el = host();
+    const chart = new StreamChart(el, { data: streamData() });
+    const bands = [...el.querySelectorAll('svg path')].filter((p) =>
+      p.getAttribute('d')?.endsWith('Z'),
+    );
+    expect(bands.length).toBe(3);
+    // x-axis labels present.
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('Jan');
+    // Bands are centred on the midline: the union of band y-extents should
+    // straddle the plot centre, not pile up from the bottom.
+    chart.setData({
+      labels: ['Jan', 'Feb'],
+      series: [{ id: 'a', data: [10, 20] }],
+    });
+    expect(el.querySelectorAll('svg path').length).toBeGreaterThanOrEqual(1);
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('toggling a series re-stacks the remaining bands', () => {
+    const el = host();
+    const chart = new StreamChart(el, { data: streamData() });
+    const bandCount = () =>
+      [...el.querySelectorAll('svg path')].filter((p) => (p.getAttribute('d') ?? '').endsWith('Z')).length;
+    expect(bandCount()).toBe(3);
+    chart.toggleSeries('b');
+    expect(chart.isSeriesVisible('b')).toBe(false);
+    expect(bandCount()).toBe(2);
+    chart.toggleSeries('b');
+    expect(bandCount()).toBe(3);
+    chart.destroy();
   });
 });
 

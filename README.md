@@ -14,7 +14,32 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart`
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`**
+
+### ★ Stream — magnitudes flowing as a living river
+
+A streamgraph reimagined for this engine: stacked categories flow around a
+symmetric centreline as smooth Catmull-Rom ribbons, and **every edge vertex is
+an independent spring**, so the whole river breathes and re-balances when the
+data changes. Thickness reads as magnitude over time; total thickness is the
+running total. Hover isolates a band (others fade) with its value and share.
+Lovely for budget burn, resource allocation, or traffic mix over time.
+
+```ts
+import { StreamChart } from 'nova-charts';
+
+new StreamChart(el, {
+  data: {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
+    series: [
+      { id: 'infra',   name: 'Infra',   data: [30, 34, 31, 38] },
+      { id: 'product', name: 'Product', data: [42, 48, 55, 51] },
+      { id: 'design',  name: 'Design',  data: [18, 22, 20, 26] },
+    ],
+  },
+  curve: 'catmull-rom',     // the organic look (also 'linear' | 'step')
+});
+```
 
 ### ★ BudgetFlow — schedule + budget + health + forecast in one timeline
 

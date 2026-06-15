@@ -24,6 +24,7 @@ export {
   type SankeyLink,
   type SankeyNode,
 } from './chart/sankey.js';
+export { StreamChart, type StreamChartOptions } from './chart/stream.js';
 
 export { Chart } from './core/chart.js';
 export type {
