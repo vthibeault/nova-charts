@@ -12,6 +12,7 @@ import { FunnelChart } from './funnel.js';
 import { WaterfallChart } from './waterfall.js';
 import { CandlestickChart } from './candlestick.js';
 import { GanttChart } from './gantt.js';
+import { BudgetFlowChart } from './budgetflow.js';
 import { TreemapChart } from './treemap.js';
 import { BoxPlotChart } from './boxplot.js';
 import { SankeyChart } from './sankey.js';
@@ -240,6 +241,57 @@ describe('GanttChart smoke', () => {
       el.querySelectorAll('svg rect')[1]!.getAttribute('width'),
     );
     expect(overlayAfter).toBeGreaterThan(overlayBefore);
+    chart.destroy();
+  });
+});
+
+describe('BudgetFlowChart smoke', () => {
+  const day = 86_400_000;
+  const t0 = new Date(2026, 5, 1).getTime();
+  const tasks = (spent = 30_000) => [
+    { id: 'a', name: 'Alpha', start: t0, end: t0 + 10 * day, budget: 50_000, spent },
+    {
+      id: 'b',
+      name: 'Beta',
+      start: t0 + 8 * day,
+      end: t0 + 20 * day,
+      budget: 80_000,
+      spent: 20_000,
+      dependsOn: ['a'],
+    },
+  ];
+
+  it('renders envelope + burn + forecast rects, labels, playhead, connector', () => {
+    const el = host();
+    const chart = new BudgetFlowChart(el, {
+      tasks: tasks(),
+      now: t0 + 12 * day,
+      margin: { left: 100 },
+    });
+    // 3 rects per task (envelope, forecast, burn) = 6
+    expect(el.querySelectorAll('svg .nova-flow rect').length).toBe(6);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts.some((t) => t?.includes('Alpha'))).toBe(true);
+    expect(texts).toContain('TODAY');
+    // One dependency connector.
+    expect(el.querySelectorAll('svg path[stroke-dasharray]').length).toBe(1);
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('burn fill widens as spend is logged', () => {
+    const el = host();
+    const chart = new BudgetFlowChart(el, {
+      tasks: tasks(10_000),
+      now: t0 + 12 * day,
+      margin: { left: 100 },
+    });
+    const burnWidth = (): number =>
+      Number(el.querySelector('svg .nova-flow-burn')!.getAttribute('width'));
+    const before = burnWidth();
+    chart.setTasks(tasks(45_000));
+    const after = burnWidth();
+    expect(after).toBeGreaterThan(before);
     chart.destroy();
   });
 });

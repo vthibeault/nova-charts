@@ -14,7 +14,33 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · `TreemapChart` · `BoxPlotChart` · `SankeyChart`
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart`
+
+### ★ BudgetFlow — schedule + budget + health + forecast in one timeline
+
+A new chart for project & budget management. Each task is a ribbon on a time
+axis where **thickness encodes its budget**, a sweeping **fill encodes
+spend-to-date**, the gap between the burn front and the **"today" playhead**
+(reinforced by a green→amber→red color spring) reads as **health**, and a
+translucent tail past the planned end **forecasts an over-run** when the
+current burn rate (CPI) projects over budget. Log spend and the fill flows, the
+colour shifts, and the forecast morphs — all spring-driven.
+
+```ts
+import { BudgetFlowChart } from 'nova-charts';
+
+const chart = new BudgetFlowChart(el, {
+  now: new Date(),                    // the "today" playhead
+  currency: (n) => `$${Math.round(n / 1000)}k`,
+  tasks: [
+    { id: 'design', name: 'Design', start: d0, end: d1, budget: 60_000, spent: 41_000 },
+    { id: 'build',  name: 'Build',  start: d1, end: d2, budget: 180_000, spent: 96_000, dependsOn: ['design'] },
+  ],
+});
+chart.setTasks(next);                 // ribbons, fills, colours, forecast all glide
+chart.setNow(Date.now());             // advance the playhead
+chart.on('point:enter', (e) => ...);  // hover gives CPI / EAC / variance / status
+```
 
 ## Quick start
 
