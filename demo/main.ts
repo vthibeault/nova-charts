@@ -15,6 +15,7 @@ import { mountBudgetFlowDemo } from './demos/budgetflow.js';
 import { mountTreemapDemo } from './demos/treemap.js';
 import { mountBoxPlotDemo } from './demos/boxplot.js';
 import { mountSankeyDemo } from './demos/sankey.js';
+import { mountStreamDemo } from './demos/stream.js';
 import { mountStressDemo } from './demos/stress.js';
 
 type DemoMount = (host: HTMLElement) => () => void;
@@ -37,6 +38,7 @@ const demos: { id: string; name: string; mount: DemoMount }[] = [
   { id: 'treemap', name: 'Treemap', mount: mountTreemapDemo },
   { id: 'boxplot', name: 'Box plot', mount: mountBoxPlotDemo },
   { id: 'sankey', name: 'Sankey', mount: mountSankeyDemo },
+  { id: 'stream', name: '★ Stream', mount: mountStreamDemo },
   { id: 'stress', name: 'Stress test', mount: mountStressDemo },
 ];
 
