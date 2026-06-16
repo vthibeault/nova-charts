@@ -25,6 +25,17 @@ export {
   type SankeyNode,
 } from './chart/sankey.js';
 export { StreamChart, type StreamChartOptions } from './chart/stream.js';
+export {
+  ForecastChart,
+  type ForecastChartOptions,
+  type ForecastTask,
+} from './chart/forecast.js';
+export {
+  simulateSchedule,
+  percentile,
+  type SimTask,
+  type SimResult,
+} from './analysis/montecarlo.js';
 
 export { Chart } from './core/chart.js';
 export type {

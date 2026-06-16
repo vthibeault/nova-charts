@@ -17,6 +17,7 @@ import { TreemapChart } from './treemap.js';
 import { BoxPlotChart } from './boxplot.js';
 import { SankeyChart } from './sankey.js';
 import { StreamChart } from './stream.js';
+import { ForecastChart } from './forecast.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -411,6 +412,45 @@ describe('StreamChart smoke', () => {
     expect(bandCount()).toBe(2);
     chart.toggleSeries('b');
     expect(bandCount()).toBe(3);
+    chart.destroy();
+  });
+});
+
+describe('ForecastChart smoke', () => {
+  const tasks = (backendPess = 20) => [
+    { id: 'a', name: 'Research', optimistic: 3, likely: 5, pessimistic: 9 },
+    { id: 'b', name: 'Backend', optimistic: 8, likely: 12, pessimistic: backendPess, dependsOn: ['a'] },
+    { id: 'c', name: 'QA', optimistic: 4, likely: 6, pessimistic: 12, dependsOn: ['b'] },
+  ];
+
+  it('renders one ridge per task plus a project ridge, axis labels, conf line', () => {
+    const el = host();
+    const chart = new ForecastChart(el, { tasks: tasks(), iterations: 400, seed: 1, margin: { left: 90 } });
+    // 3 task ridges + 1 project ridge = 4 closed area paths.
+    const ridges = [...el.querySelectorAll('svg path')].filter((p) => (p.getAttribute('d') ?? '').endsWith('Z'));
+    expect(ridges.length).toBe(4);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('PROJECT');
+    expect(texts.some((t) => t?.startsWith('P85'))).toBe(true); // confidence label
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('adding risk pushes the project P85 finish later', () => {
+    const el = host();
+    const chart = new ForecastChart(el, { tasks: tasks(20), iterations: 600, seed: 5, margin: { left: 90 } });
+    // The axis rescales with the horizon, so read the P85 value from the
+    // confidence label, not its pixel x.
+    const p85 = (): number => {
+      const label = [...el.querySelectorAll('svg text')].find((t) =>
+        t.textContent?.startsWith('P85'),
+      )!.textContent!;
+      return Number(/(\d+)d/.exec(label)![1]);
+    };
+    const before = p85();
+    chart.setTasks(tasks(40)); // much riskier backend
+    const after = p85();
+    expect(after).toBeGreaterThan(before);
     chart.destroy();
   });
 });
