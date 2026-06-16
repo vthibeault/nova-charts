@@ -14,7 +14,36 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`**
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`**
+
+### ★ Forecast — a Monte-Carlo schedule as a field of probability
+
+Every other PM chart shows a project as a single deterministic plan — one bar,
+one date. Reality is probabilistic. **ForecastChart** runs a Monte-Carlo
+simulation over three-point (PERT) task estimates, propagates the uncertainty
+through the dependency graph, and renders the result as a field of **density
+ridges**: each task's completion is a *distribution*, not a bar; downstream
+ridges spread wider as uncertainty compounds; the tasks that most often decide
+the finish **glow** (criticality); P50/P85 markers sit on every ridge; and a
+headline **confidence line** reads the realistic project finish. Change an
+estimate and the whole field ripples — every ridge morphs via per-vertex
+springs. The simulation core is exported (`simulateSchedule`) and unit-tested.
+
+```ts
+import { ForecastChart } from 'nova-charts';
+
+const chart = new ForecastChart(el, {
+  iterations: 800,
+  confidence: 85,                 // the headline percentile line
+  start: new Date(),              // omit for durations instead of dates
+  tasks: [
+    { id: 'design', name: 'Design', optimistic: 4, likely: 6, pessimistic: 11 },
+    { id: 'build',  name: 'Build',  optimistic: 8, likely: 12, pessimistic: 22, dependsOn: ['design'] },
+    { id: 'qa',     name: 'QA',     optimistic: 4, likely: 6, pessimistic: 14, dependsOn: ['build'] },
+  ],
+});
+chart.setTasks(next);             // re-simulate; the uncertainty field ripples
+```
 
 ### ★ Stream — magnitudes flowing as a living river
 
