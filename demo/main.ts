@@ -17,6 +17,7 @@ import { mountBoxPlotDemo } from './demos/boxplot.js';
 import { mountSankeyDemo } from './demos/sankey.js';
 import { mountStreamDemo } from './demos/stream.js';
 import { mountForecastDemo } from './demos/forecast.js';
+import { mountCascadeDemo } from './demos/cascade.js';
 import { mountStressDemo } from './demos/stress.js';
 
 type DemoMount = (host: HTMLElement) => () => void;
@@ -41,6 +42,7 @@ const demos: { id: string; name: string; mount: DemoMount }[] = [
   { id: 'sankey', name: 'Sankey', mount: mountSankeyDemo },
   { id: 'stream', name: '★ Stream', mount: mountStreamDemo },
   { id: 'forecast', name: '★ Forecast', mount: mountForecastDemo },
+  { id: 'cascade', name: '★ Cascade', mount: mountCascadeDemo },
   { id: 'stress', name: 'Stress test', mount: mountStressDemo },
 ];
 

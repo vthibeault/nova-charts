@@ -36,6 +36,17 @@ export {
   type SimTask,
   type SimResult,
 } from './analysis/montecarlo.js';
+export {
+  CascadeChart,
+  type CascadeChartOptions,
+  type CascadeTask,
+} from './chart/cascade.js';
+export {
+  criticalPath,
+  type CpmTask,
+  type CpmNode,
+  type CpmResult,
+} from './analysis/criticalpath.js';
 
 export { Chart } from './core/chart.js';
 export type {
