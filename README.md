@@ -16,33 +16,37 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 `LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`** · **`CascadeChart`**
 
-### ★ Cascade — a live critical-path what-if
+### ★ Cascade — an SAP-style WBS critical-path what-if
 
 The question every PM asks and no tool answers visually: *"if this task slips, do
-we still hit the date?"* **CascadeChart** computes the full Critical Path Method
-(forward/backward pass) and renders each task with its **slack buffer** — a
-translucent trail showing exactly how long it can slip before it moves the
-finish. **Nudge a task later** (click it, or via `nudge()`) and the delay
-**ripples downstream** through the dependency chain, staggered by dependency
-depth so you literally watch it travel: bars slide, buffers shrink, colours run
-green→amber→red as slack is consumed, and the project finish line moves. Slip a
-task that *has* slack and the date doesn't budge — the buffer absorbs it. The
-CPM engine is exported (`criticalPath`) and unit-tested.
+we still hit the date?"* **CascadeChart** is a **work-breakdown-structure (WBS)
+timeline** in the spirit of SAP Project System. Tasks form a hierarchy (project →
+WBS levels → activities); collapsed WBS elements show a **rolled-up summary bar**
+with a leaf count, and clicking one (or its ▸) **drills into** its sub-WBS and
+activities. Under the hood the full Critical Path Method (forward/backward pass)
+runs on the leaf activities; each row trails its **slack buffer**, and **nudging
+an activity** ripples the delay downstream — staggered by dependency depth so you
+watch it travel: bars slide, buffers shrink, colours run green→amber→red as slack
+is consumed, and the project finish moves (a task with slack absorbs the slip and
+the date holds). The CPM engine is exported (`criticalPath`) and unit-tested.
 
 ```ts
 import { CascadeChart } from 'nova-charts';
 
 const chart = new CascadeChart(el, {
   deadline: 34,
+  expanded: ['P'],                                  // open the top level
   tasks: [
-    { id: 'design', name: 'Design', duration: 6, dependsOn: ['spec'] },
-    { id: 'api',    name: 'API',    duration: 10, dependsOn: ['design'] },
-    { id: 'ui',     name: 'UI',     duration: 7,  dependsOn: ['design'] },
-    { id: 'qa',     name: 'QA',     duration: 5,  dependsOn: ['api', 'ui'] },
+    { id: 'P',  name: 'Project' },                  // WBS — rolls up its children
+    { id: 'P1', name: 'Build', parent: 'P' },       // sub-WBS
+    { id: 'api', name: 'API', parent: 'P1', duration: 10, dependsOn: ['design'] },
+    { id: 'ui',  name: 'UI',  parent: 'P1', duration: 7,  dependsOn: ['design'] },
   ],
 });
-chart.nudge('design', 3);  // slip Design 3 days — watch the cascade ripple
-chart.reset();             // clear all slips
+chart.toggle('P1');         // drill into a WBS element
+chart.nudge('api', 3);      // slip an activity — watch the cascade ripple
+chart.expandAll();          // or collapseAll()
+chart.reset();              // clear all slips
 ```
 
 ### ★ Forecast — a Monte-Carlo schedule as a field of probability
