@@ -457,51 +457,97 @@ describe('ForecastChart smoke', () => {
 });
 
 describe('CascadeChart smoke', () => {
-  const tasks = () => [
+  const flat = () => [
     { id: 'long', name: 'Long', duration: 10 },
     { id: 'short', name: 'Short', duration: 4 },
     { id: 'join', name: 'Join', duration: 1, dependsOn: ['long', 'short'] },
   ];
 
-  it('renders a bar + slack rect per task, labels, connectors, finish line', () => {
+  it('flat tasks: a bar path + slack rect per task, labels, connectors, finish', () => {
     const el = host();
-    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
-    // 2 rects per task (slack + bar) = 6.
-    expect(el.querySelectorAll('svg g g rect').length).toBe(6);
+    const chart = new CascadeChart(el, { tasks: flat(), margin: { left: 80 } });
+    expect(el.querySelectorAll('.nova-cascade-bar').length).toBe(3);
+    expect(el.querySelectorAll('.nova-cascade-slack').length).toBe(3);
     const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
-    expect(texts).toContain('Long');
+    expect(texts.some((t) => t?.startsWith('Long'))).toBe(true);
     expect(texts.some((t) => t?.startsWith('Finish'))).toBe(true);
-    // join depends on long & short → 2 connectors.
     expect(el.querySelectorAll('svg path[stroke-dasharray="3,3"]').length).toBe(2);
     chart.destroy();
     expect(el.querySelector('svg')).toBeNull();
   });
 
-  it('the shorter parallel task has a visible slack buffer; critical has none', () => {
+  it('the slack-rich parallel task shows a buffer; the critical one does not', () => {
     const el = host();
-    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
-    // Rects render in task order, slack-then-bar per task.
-    const rects = [...el.querySelectorAll('svg g g rect')];
-    const slackW = (id: string): number => {
-      const i = ['long', 'short', 'join'].indexOf(id);
-      return Number(rects[i * 2]!.getAttribute('width'));
-    };
-    expect(slackW('short')).toBeGreaterThan(0); // 6 units of float
-    expect(slackW('long')).toBeCloseTo(0, 1); // critical, no slack
+    const chart = new CascadeChart(el, { tasks: flat(), margin: { left: 80 } });
+    const slacks = [...el.querySelectorAll('.nova-cascade-slack')];
+    const labels = [...el.querySelectorAll('.nova-row text')].map((t) => t.textContent);
+    const w = (name: string): number =>
+      Number(slacks[labels.findIndex((l) => l?.startsWith(name))]!.getAttribute('width'));
+    expect(w('Short')).toBeGreaterThan(0);
+    expect(w('Long')).toBeCloseTo(0, 1);
     chart.destroy();
   });
 
-  it('nudging a task beyond its slack pushes the project finish line', () => {
+  it('nudging beyond a task’s slack pushes the project finish', () => {
     const el = host();
-    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
-    const finishText = (): string =>
-      [...el.querySelectorAll('svg text')].find((t) => t.textContent?.startsWith('Finish'))!
-        .textContent!;
-    const before = Number(/Finish (\d+)/.exec(finishText())![1]);
-    chart.nudge('short', 9); // 4 + 9 = 13 > 10 ⇒ now the long pole
-    const after = Number(/Finish (\d+)/.exec(finishText())![1]);
-    expect(after).toBeGreaterThan(before);
+    const chart = new CascadeChart(el, { tasks: flat(), margin: { left: 80 } });
+    const finish = (): number =>
+      Number(/Finish (\d+)/.exec(
+        [...el.querySelectorAll('svg text')].find((t) => t.textContent?.startsWith('Finish'))!
+          .textContent!,
+      )![1]);
+    const before = finish();
+    chart.nudge('short', 9);
+    expect(finish()).toBeGreaterThan(before);
     chart.destroy();
+  });
+
+  describe('WBS hierarchy', () => {
+    const wbs = () => [
+      { id: 'P', name: 'Project' },
+      { id: 'P1', name: 'Phase 1', parent: 'P' },
+      { id: 'a', name: 'Spec', parent: 'P1', duration: 4 },
+      { id: 'b', name: 'Build', parent: 'P1', duration: 6, dependsOn: ['a'] },
+      { id: 'P2', name: 'Phase 2', parent: 'P' },
+      { id: 'c', name: 'QA', parent: 'P2', duration: 5, dependsOn: ['b'] },
+    ];
+
+    it('collapsed root shows a rolled-up summary, hiding the activities', () => {
+      const el = host();
+      const chart = new CascadeChart(el, { tasks: wbs(), margin: { left: 100 } });
+      // Only the root row is visible; it is a WBS summary.
+      expect(el.querySelectorAll('.nova-row').length).toBe(1);
+      expect(el.querySelector('.nova-wbs')).toBeTruthy();
+      const label = el.querySelector('.nova-row text')!.textContent!;
+      expect(label).toContain('Project');
+      expect(label).toContain('(3)'); // rolls up 3 leaf activities
+      chart.destroy();
+    });
+
+    it('expanding drills into sub-WBS and activities', () => {
+      const el = host();
+      const chart = new CascadeChart(el, { tasks: wbs(), expanded: ['P'], margin: { left: 100 } });
+      // Root + its two phases visible (phases still collapsed).
+      expect(el.querySelectorAll('.nova-row').length).toBe(3);
+      chart.toggle('P1'); // open Phase 1 → its 2 activities appear
+      const labels = [...el.querySelectorAll('.nova-row text')].map((t) => t.textContent);
+      expect(labels.some((l) => l?.startsWith('Spec'))).toBe(true);
+      expect(labels.some((l) => l?.startsWith('Build'))).toBe(true);
+      expect(el.querySelectorAll('.nova-row').length).toBe(5);
+      chart.toggle('P1'); // collapse again
+      expect(el.querySelectorAll('.nova-row').length).toBe(3);
+      chart.destroy();
+    });
+
+    it('the summary rolls up the critical span of its children', () => {
+      const el = host();
+      const chart = new CascadeChart(el, { tasks: wbs(), expanded: ['P'], margin: { left: 100 } });
+      // Chain a→b→c = 4+6+5 = 15; everything is critical, so the root summary
+      // is red (critical) — its bar fill should be the red health color.
+      const rootBar = el.querySelector('.nova-wbs .nova-cascade-bar')!;
+      expect(rootBar.getAttribute('fill')).toBe('rgb(251, 113, 133)');
+      chart.destroy();
+    });
   });
 });
 
