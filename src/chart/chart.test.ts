@@ -18,6 +18,7 @@ import { BoxPlotChart } from './boxplot.js';
 import { SankeyChart } from './sankey.js';
 import { StreamChart } from './stream.js';
 import { ForecastChart } from './forecast.js';
+import { CascadeChart } from './cascade.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -450,6 +451,55 @@ describe('ForecastChart smoke', () => {
     const before = p85();
     chart.setTasks(tasks(40)); // much riskier backend
     const after = p85();
+    expect(after).toBeGreaterThan(before);
+    chart.destroy();
+  });
+});
+
+describe('CascadeChart smoke', () => {
+  const tasks = () => [
+    { id: 'long', name: 'Long', duration: 10 },
+    { id: 'short', name: 'Short', duration: 4 },
+    { id: 'join', name: 'Join', duration: 1, dependsOn: ['long', 'short'] },
+  ];
+
+  it('renders a bar + slack rect per task, labels, connectors, finish line', () => {
+    const el = host();
+    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
+    // 2 rects per task (slack + bar) = 6.
+    expect(el.querySelectorAll('svg g g rect').length).toBe(6);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('Long');
+    expect(texts.some((t) => t?.startsWith('Finish'))).toBe(true);
+    // join depends on long & short → 2 connectors.
+    expect(el.querySelectorAll('svg path[stroke-dasharray="3,3"]').length).toBe(2);
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('the shorter parallel task has a visible slack buffer; critical has none', () => {
+    const el = host();
+    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
+    // Rects render in task order, slack-then-bar per task.
+    const rects = [...el.querySelectorAll('svg g g rect')];
+    const slackW = (id: string): number => {
+      const i = ['long', 'short', 'join'].indexOf(id);
+      return Number(rects[i * 2]!.getAttribute('width'));
+    };
+    expect(slackW('short')).toBeGreaterThan(0); // 6 units of float
+    expect(slackW('long')).toBeCloseTo(0, 1); // critical, no slack
+    chart.destroy();
+  });
+
+  it('nudging a task beyond its slack pushes the project finish line', () => {
+    const el = host();
+    const chart = new CascadeChart(el, { tasks: tasks(), margin: { left: 80 } });
+    const finishText = (): string =>
+      [...el.querySelectorAll('svg text')].find((t) => t.textContent?.startsWith('Finish'))!
+        .textContent!;
+    const before = Number(/Finish (\d+)/.exec(finishText())![1]);
+    chart.nudge('short', 9); // 4 + 9 = 13 > 10 ⇒ now the long pole
+    const after = Number(/Finish (\d+)/.exec(finishText())![1]);
     expect(after).toBeGreaterThan(before);
     chart.destroy();
   });

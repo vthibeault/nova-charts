@@ -14,7 +14,36 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`**
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`** · **`CascadeChart`**
+
+### ★ Cascade — a live critical-path what-if
+
+The question every PM asks and no tool answers visually: *"if this task slips, do
+we still hit the date?"* **CascadeChart** computes the full Critical Path Method
+(forward/backward pass) and renders each task with its **slack buffer** — a
+translucent trail showing exactly how long it can slip before it moves the
+finish. **Nudge a task later** (click it, or via `nudge()`) and the delay
+**ripples downstream** through the dependency chain, staggered by dependency
+depth so you literally watch it travel: bars slide, buffers shrink, colours run
+green→amber→red as slack is consumed, and the project finish line moves. Slip a
+task that *has* slack and the date doesn't budge — the buffer absorbs it. The
+CPM engine is exported (`criticalPath`) and unit-tested.
+
+```ts
+import { CascadeChart } from 'nova-charts';
+
+const chart = new CascadeChart(el, {
+  deadline: 34,
+  tasks: [
+    { id: 'design', name: 'Design', duration: 6, dependsOn: ['spec'] },
+    { id: 'api',    name: 'API',    duration: 10, dependsOn: ['design'] },
+    { id: 'ui',     name: 'UI',     duration: 7,  dependsOn: ['design'] },
+    { id: 'qa',     name: 'QA',     duration: 5,  dependsOn: ['api', 'ui'] },
+  ],
+});
+chart.nudge('design', 3);  // slip Design 3 days — watch the cascade ripple
+chart.reset();             // clear all slips
+```
 
 ### ★ Forecast — a Monte-Carlo schedule as a field of probability
 
