@@ -18,19 +18,28 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ### ★ Gantt Editor — an MS-Project-style editor, not just a chart
 
-`GanttChart` *shows* a schedule; **`GanttEditor`** lets you *build* one. It's a
-fully interactive, reusable component — a sortable task grid beside a live
-timeline — where every edit is the same fluid transition the charts are known
-for. **Drag a bar** to reschedule it, **drag its right edge** to resize the
-duration, **drag the dot at a bar's end onto another bar** to draw a dependency
-(cycles are rejected), and **double-click a name, start, or duration** in the
-grid to edit it inline. Tasks nest into a WBS via **indent/outdent**: a parent
-becomes a **summary bar** that rolls up its children and **collapses** to hide
-them. The whole plan is **auto-scheduled like MS Project** — a task starts at the
-later of its manual start and its predecessors' finishes — so any edit **ripples
-downstream** and dependents glide to their new positions. Set a **baseline** to
-freeze a grey reference strip under each bar, and the **critical path** is drawn
-in red. The scheduler is a pure, exported, unit-tested function (`schedule`).
+`GanttChart` *shows* a schedule; **`GanttEditor`** lets you *build* one — and it's
+**the first Gantt editor that's genuinely built for touch**, not a desktop grid
+bolted onto a phone. It's a fully interactive, reusable component — a sortable
+task grid beside a live timeline — where every edit is the same fluid transition
+the charts are known for. **Drag a bar** to reschedule it, **drag its right edge**
+to resize the duration, **drag the dot at a bar's end onto another bar** to draw a
+dependency (cycles are rejected), and **tap a row then tap its name or duration**
+(or double-click) to edit it inline. Tasks nest into a WBS via **indent/outdent**:
+a parent becomes a **summary bar** that rolls up its children and **collapses** to
+hide them. The whole plan is **auto-scheduled like MS Project** — a task starts at
+the later of its manual start and its predecessors' finishes — so any edit
+**ripples downstream** and dependents glide to their new positions. Set a
+**baseline** to freeze a grey reference strip under each bar, and the **critical
+path** is drawn in red. The scheduler is a pure, exported, unit-tested function
+(`schedule`).
+
+**Mobile-first by design.** Every bar carries finger-sized resize, link and
+progress handles; dragging a bar uses pointer capture and `touch-action` so it
+never fights the page scroll; **pinch the timeline to zoom** (the day under your
+fingers stays anchored); and on a narrow screen the grid **collapses to a frozen
+name column** while the timeline scrolls horizontally beside it. It works
+identically with a mouse or a thumb.
 
 ```ts
 import { GanttEditor } from 'nova-charts';

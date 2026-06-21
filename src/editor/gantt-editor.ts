@@ -26,17 +26,21 @@ export interface GanttEditorOptions {
 
 const DAY = 86_400_000;
 const PALETTE = ['#6366f1', '#22d3ee', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#4ade80'];
+/** Horizontal offset of the link handle from a bar's right edge (clear of the resize zone). */
+const LINK_DX = 16;
 
 const STYLE_ID = 'nova-gantt-editor-css';
 const CSS = `
 .nge { display:flex; flex-direction:column; height:100%; font:13px var(--nova-font,system-ui,sans-serif);
-  color:var(--nge-fg,#cbd5e1); --nge-row:32px; --nge-grid:rgba(148,163,184,.16); border:1px solid var(--nge-grid); border-radius:10px; overflow:hidden; background:var(--nge-bg,#0f1626); }
+  color:var(--nge-fg,#cbd5e1); --nge-row:32px; --nge-name:260px; --nge-grid:rgba(148,163,184,.16); border:1px solid var(--nge-grid); border-radius:10px; overflow:hidden; background:var(--nge-bg,#0f1626);
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
 .nge-toolbar { display:flex; gap:6px; padding:8px; border-bottom:1px solid var(--nge-grid); flex-wrap:wrap; align-items:center; }
-.nge-toolbar button { background:rgba(99,102,241,.16); border:1px solid rgba(99,102,241,.35); color:#c7d2fe; border-radius:7px; padding:5px 10px; font:12px var(--nova-font,system-ui); cursor:pointer; }
+.nge-toolbar button { background:rgba(99,102,241,.16); border:1px solid rgba(99,102,241,.35); color:#c7d2fe; border-radius:8px; padding:7px 11px; min-height:34px; font:12px var(--nova-font,system-ui); cursor:pointer; touch-action:manipulation; }
 .nge-toolbar button:hover { background:rgba(99,102,241,.3); }
 .nge-toolbar button:disabled { opacity:.4; cursor:default; }
 .nge-toolbar .sp { flex:1; }
-.nge-body { display:flex; flex:1; min-height:0; overflow:auto; }
+/* Body scrolls vertically; the grid (name column) stays frozen while the timeline scrolls horizontally on its own. */
+.nge-body { display:flex; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; }
 .nge-grid { flex:none; border-right:1px solid var(--nge-grid); }
 .nge-ghead, .nge-grow { display:grid; grid-template-columns: var(--nge-name,260px) 56px 44px 56px; align-items:center; height:var(--nge-row); }
 .nge-ghead { position:sticky; top:0; background:var(--nge-bg,#0f1626); border-bottom:1px solid var(--nge-grid); font-weight:600; color:var(--nova-fg-muted,#94a3b8); z-index:2; }
@@ -46,13 +50,21 @@ const CSS = `
 .nge-cell { padding:0 8px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .nge-cell.num { text-align:right; font-variant-numeric:tabular-nums; color:var(--nova-fg-muted,#94a3b8); }
 .nge-name { display:flex; align-items:center; gap:4px; }
-.nge-chev { width:12px; height:12px; flex:none; cursor:pointer; transition:transform .15s; color:var(--nova-fg-muted,#94a3b8); }
+.nge-chev { width:16px; height:16px; flex:none; cursor:pointer; transition:transform .15s; color:var(--nova-fg-muted,#94a3b8); }
 .nge-chev.open { transform:rotate(90deg); }
-.nge-cell input { width:100%; box-sizing:border-box; background:#0b1020; border:1px solid #6366f1; color:#fff; border-radius:4px; padding:2px 4px; font:inherit; }
-.nge-timeline { position:relative; flex:1; min-width:0; }
+.nge-cell input { width:100%; box-sizing:border-box; background:#0b1020; border:1px solid #6366f1; color:#fff; border-radius:4px; padding:4px 6px; font:inherit; }
+.nge-timeline { position:relative; flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; touch-action:pan-x; }
 .nge-timeline svg { display:block; }
 .nge-bar { cursor:grab; }
 .nge-bar:active { cursor:grabbing; }
+/* Draggable handles must not let the browser hijack the gesture into a scroll/zoom. */
+.nge-bar, .nge-resize, .nge-link, .nge-prog { touch-action:none; }
+.nge-resize { cursor:ew-resize; }
+.nge-link, .nge-prog { cursor:pointer; }
+/* Compact (narrow / touch) layout: the grid shrinks to a frozen name-only column. */
+.nge.compact .nge-grid { width:150px; }
+.nge.compact .nge-ghead, .nge.compact .nge-grow { grid-template-columns: 1fr; }
+.nge.compact .nge-cell.num { display:none; }
 `;
 
 function injectCss(): void {
@@ -109,6 +121,10 @@ export class GanttEditor {
   private sched = schedule([]);
   private rows: { id: string; level: number }[] = [];
   private drag: Drag | null = null;
+  /** Live pointers by id (client x) — drives two-finger pinch-to-zoom. */
+  private pointers = new Map<number, number>();
+  private pinch: { startDist: number; startDayWidth: number } | null = null;
+  private ro: ResizeObserver | null = null;
 
   constructor(el: HTMLElement, options: GanttEditorOptions) {
     injectCss();
@@ -198,8 +214,13 @@ export class GanttEditor {
       for (const u of b.depUnsub) u();
     }
     this.bars.clear();
+    window.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
+    this.ro?.disconnect();
+    this.ro = null;
     this.el.replaceChildren();
-    this.el.classList.remove('nge');
+    this.el.classList.remove('nge', 'compact');
   }
 
   // ---- build DOM ------------------------------------------------------------
@@ -258,6 +279,15 @@ export class GanttEditor {
     this.svg.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
+
+    // Collapse to a name-only grid when the editor is narrow (phones, split panes).
+    if (typeof ResizeObserver !== 'undefined') {
+      this.ro = new ResizeObserver(() => {
+        this.el.classList.toggle('compact', this.el.clientWidth < 640);
+      });
+      this.ro.observe(this.el);
+    }
   }
 
   // ---- geometry helpers -----------------------------------------------------
@@ -266,7 +296,8 @@ export class GanttEditor {
     return this.opts.rowHeight;
   }
   private get headerH(): number {
-    return 28;
+    // Match the grid header row so grid rows and timeline bars stay aligned.
+    return this.rowH;
   }
   private dayX(day: number): number {
     return 8 + day * this.opts.dayWidth;
@@ -297,7 +328,7 @@ export class GanttEditor {
     this.sched = schedule(this.tasks);
     this.rows = this.visibleRows();
     const finishDays = Math.max(this.sched.finish + 3, 14);
-    const width = this.dayX(finishDays);
+    const width = this.dayX(finishDays) + 30; // headroom for end-of-bar link handles
     const height = this.headerH + this.rows.length * this.rowH;
     this.el.style.setProperty('--nge-row', `${this.rowH}px`);
     this.svg.setAttribute('width', String(width));
@@ -371,10 +402,14 @@ export class GanttEditor {
       nameText.style.flex = '1';
       nameText.style.overflow = 'hidden';
       nameText.style.textOverflow = 'ellipsis';
-      nameText.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
+      const editName = (): void =>
         this.editCell(nameCell, nameText, task.name, (v) => { task.name = v || task.name; this.commit(false); });
+      // Tap an already-selected row's name to edit (no double-tap needed on touch);
+      // double-click still works for desktop muscle memory.
+      nameText.addEventListener('click', (e) => {
+        if (this.selected === r.id) { e.stopPropagation(); editName(); }
       });
+      nameText.addEventListener('dblclick', (e) => { e.stopPropagation(); editName(); });
       nameCell.appendChild(nameText);
       row.appendChild(nameCell);
 
@@ -387,13 +422,18 @@ export class GanttEditor {
       durCell.className = 'nge-cell num';
       durCell.textContent = isSummary ? '' : String(task.duration);
       if (!isSummary) {
-        durCell.addEventListener('dblclick', (e) => {
-          e.stopPropagation();
+        const editDur = (): void =>
           this.editCell(durCell, null, String(task.duration), (v) => {
             const n = Math.max(1, Math.round(Number(v) || task.duration));
             task.duration = n;
             this.commit(false);
           });
+        durCell.addEventListener('click', (e) => {
+          if (this.selected === r.id) { e.stopPropagation(); editDur(); }
+        });
+        durCell.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          editDur();
         });
       }
       row.appendChild(durCell);
@@ -416,7 +456,9 @@ export class GanttEditor {
   }
 
   private editCell(cell: HTMLElement, label: HTMLElement | null, value: string, commit: (v: string) => void): void {
+    if (cell.querySelector('input')) return; // already editing (click + dblclick can both fire)
     const input = document.createElement('input');
+    input.inputMode = label ? 'text' : 'numeric';
     input.value = value;
     if (label) label.style.display = 'none';
     cell.appendChild(input);
@@ -520,11 +562,15 @@ export class GanttEditor {
     if (progress > 0) {
       svgEl('rect', { x, y, width: w * Math.min(progress, 1), height: h, rx: 4, fill: critical ? '#fb7185' : color, class: 'nge-bar', 'data-id': id }, g);
     }
-    // Progress handle (small triangle at the fill front).
+    // Resize: an explicit, finger-sized hit handle straddling the right edge.
+    svgEl('rect', { x: x + w - 10, y: y - 2, width: 14, height: h + 4, fill: 'transparent', class: 'nge-resize', 'data-id': id }, g);
+    // Progress handle (triangle at the fill front) with a transparent touch halo behind it.
     const px = x + w * Math.min(progress, 1);
+    svgEl('circle', { cx: px, cy: y + h, r: 10, fill: 'transparent', class: 'nge-prog', 'data-id': id }, g);
     svgEl('path', { d: `M${px - 4},${y + h}L${px + 4},${y + h}L${px},${y + h + 5}Z`, fill: 'var(--nova-fg,#cbd5e1)', class: 'nge-prog', 'data-id': id }, g);
-    // Link handle (circle just past the bar's right edge, clear of the resize zone).
-    svgEl('circle', { cx: x + w + 6, cy, r: 4, fill: 'var(--nova-fg,#cbd5e1)', class: 'nge-link', 'data-id': id }, g);
+    // Link handle (dot past the right edge) with a transparent touch halo behind it.
+    svgEl('circle', { cx: x + w + LINK_DX, cy, r: 12, fill: 'transparent', class: 'nge-link', 'data-id': id }, g);
+    svgEl('circle', { cx: x + w + LINK_DX, cy, r: 4, fill: 'var(--nova-fg,#cbd5e1)', class: 'nge-link', 'data-id': id }, g);
   }
 
   private renderLinks(): void {
@@ -567,6 +613,15 @@ export class GanttEditor {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    this.pointers.set(e.pointerId, e.clientX);
+    // Second finger anywhere → pinch-to-zoom the timeline (abandons any bar drag).
+    if (this.pointers.size === 2) {
+      this.endDrag();
+      const xs = [...this.pointers.values()];
+      this.pinch = { startDist: Math.abs(xs[0]! - xs[1]!) || 1, startDayWidth: this.opts.dayWidth };
+      return;
+    }
+
     const el = e.target as Element;
     const id = el.getAttribute('data-id');
     if (!id) return;
@@ -578,18 +633,28 @@ export class GanttEditor {
     const p = this.svgPoint(e);
     const x = this.dayX(node.start);
     const w = this.dayX(node.end) - x;
+    const cls = el.classList;
 
-    if (el.classList.contains('nge-link')) {
-      const line = svgEl('line', { x1: x + w + 6, y1: node ? this.barCy(id) : p.y, x2: p.x, y2: p.y, stroke: 'var(--nova-c1,#6366f1)', 'stroke-width': 2, 'stroke-dasharray': '4,3' }, this.linkLayer);
+    if (cls.contains('nge-link')) {
+      const line = svgEl('line', { x1: x + w + LINK_DX, y1: this.barCy(id), x2: p.x, y2: p.y, stroke: 'var(--nova-c1,#6366f1)', 'stroke-width': 2, 'stroke-dasharray': '4,3' }, this.linkLayer);
       this.drag = { mode: 'link', id, startX: p.x, startDay: node.start, startDur: task.duration, linkLine: line };
-    } else if (el.classList.contains('nge-prog')) {
+    } else if (cls.contains('nge-prog')) {
       this.drag = { mode: 'progress', id, startX: p.x, startDay: node.start, startDur: task.duration };
-    } else if (!this.hasChildren(id) && p.x > x + w - 8) {
+    } else if (cls.contains('nge-resize')) {
       this.drag = { mode: 'resize', id, startX: p.x, startDay: node.start, startDur: task.duration };
     } else if (!this.hasChildren(id)) {
       this.drag = { mode: 'move', id, startX: p.x, startDay: task.start, startDur: task.duration };
     }
-    if (this.drag) e.preventDefault();
+    if (this.drag) {
+      try { this.svg.setPointerCapture(e.pointerId); } catch { /* not all targets support capture */ }
+      e.preventDefault();
+    }
+  }
+
+  /** Abandon an in-progress bar drag, cleaning up its transient link line. */
+  private endDrag(): void {
+    this.drag?.linkLine?.remove();
+    this.drag = null;
   }
 
   private barCy(id: string): number {
@@ -597,6 +662,24 @@ export class GanttEditor {
   }
 
   private onPointerMove = (e: PointerEvent): void => {
+    if (this.pinch && this.pointers.has(e.pointerId)) {
+      this.pointers.set(e.pointerId, e.clientX);
+      const xs = [...this.pointers.values()];
+      if (xs.length >= 2) {
+        const dist = Math.abs(xs[0]! - xs[1]!) || 1;
+        const next = Math.max(8, Math.min(80, this.pinch.startDayWidth * (dist / this.pinch.startDist)));
+        if (Math.abs(next - this.opts.dayWidth) >= 0.5) {
+          // Keep the day under the pinch midpoint anchored as the scale changes.
+          const mid = (xs[0]! + xs[1]!) / 2;
+          const rect = this.timelineEl.getBoundingClientRect();
+          const dayAtMid = (mid - rect.left + this.timelineEl.scrollLeft - 8) / this.opts.dayWidth;
+          this.opts.dayWidth = next;
+          this.render(false);
+          this.timelineEl.scrollLeft = 8 + dayAtMid * next - (mid - rect.left);
+        }
+      }
+      return;
+    }
     if (!this.drag) return;
     const p = this.svgPoint(e);
     const task = this.tasks.find((t) => t.id === this.drag!.id)!;
@@ -620,20 +703,26 @@ export class GanttEditor {
   };
 
   private onPointerUp = (e: PointerEvent): void => {
+    this.pointers.delete(e.pointerId);
+    try { this.svg.releasePointerCapture(e.pointerId); } catch { /* capture may not be held */ }
+    if (this.pinch) {
+      if (this.pointers.size < 2) this.pinch = null;
+      return;
+    }
     if (!this.drag) return;
     const d = this.drag;
     this.drag = null;
     if (d.mode === 'link') {
       d.linkLine?.remove();
-      const target = (e.target as Element)?.getAttribute('data-id');
+      // Pointer capture retargets pointerup to the svg, so resolve the drop by hit-test.
+      const dropped = document.elementFromPoint(e.clientX, e.clientY);
+      const target = dropped?.getAttribute('data-id');
       if (target && target !== d.id && !this.wouldCycle(d.id, target)) {
         const t = this.tasks.find((x) => x.id === target)!;
         const deps = new Set(t.dependsOn ?? []);
         deps.add(d.id);
         t.dependsOn = [...deps];
       }
-      this.commit(false);
-    } else if (d.mode === 'progress') {
       this.commit(false);
     } else {
       this.commit(false);

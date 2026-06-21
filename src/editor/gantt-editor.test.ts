@@ -70,6 +70,30 @@ describe('GanttEditor', () => {
     ed.destroy();
   });
 
+  it('renders finger-sized drag handles (resize, link, progress) for leaf bars', () => {
+    const el = host();
+    const ed = new GanttEditor(el, {
+      tasks: [{ id: 'a', name: 'Alpha', start: 0, duration: 4, progress: 0.5 }],
+    });
+    expect(el.querySelector('.nge-resize')).toBeTruthy();
+    expect(el.querySelector('circle.nge-link')).toBeTruthy();
+    expect(el.querySelector('.nge-prog')).toBeTruthy();
+    ed.destroy();
+  });
+
+  it('single tap on a selected row edits its name (no double-tap needed)', () => {
+    const el = host();
+    const ed = new GanttEditor(el, { tasks: [{ id: 'a', name: 'Alpha', start: 0, duration: 4 }] });
+    const span = () => el.querySelector('.nge-grow .nge-name span') as HTMLElement;
+    // First tap selects the row; no inline editor yet.
+    span().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.querySelector('.nge-grid input')).toBeNull();
+    // Second tap on the (re-rendered) selected row opens the inline editor.
+    span().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.querySelector('.nge-grid input')).toBeTruthy();
+    ed.destroy();
+  });
+
   it('collapsing a summary hides its children', () => {
     const el = host();
     const ed = new GanttEditor(el, {
