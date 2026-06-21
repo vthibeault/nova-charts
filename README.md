@@ -16,6 +16,45 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 `LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`** · **`CascadeChart`**
 
+### ★ Gantt Editor — an MS-Project-style editor, not just a chart
+
+`GanttChart` *shows* a schedule; **`GanttEditor`** lets you *build* one. It's a
+fully interactive, reusable component — a sortable task grid beside a live
+timeline — where every edit is the same fluid transition the charts are known
+for. **Drag a bar** to reschedule it, **drag its right edge** to resize the
+duration, **drag the dot at a bar's end onto another bar** to draw a dependency
+(cycles are rejected), and **double-click a name, start, or duration** in the
+grid to edit it inline. Tasks nest into a WBS via **indent/outdent**: a parent
+becomes a **summary bar** that rolls up its children and **collapses** to hide
+them. The whole plan is **auto-scheduled like MS Project** — a task starts at the
+later of its manual start and its predecessors' finishes — so any edit **ripples
+downstream** and dependents glide to their new positions. Set a **baseline** to
+freeze a grey reference strip under each bar, and the **critical path** is drawn
+in red. The scheduler is a pure, exported, unit-tested function (`schedule`).
+
+```ts
+import { GanttEditor } from 'nova-charts';
+
+const editor = new GanttEditor(el, {
+  startDate: new Date(2026, 5, 1),
+  dayWidth: 24,
+  tasks: [
+    { id: 'plan',   name: 'Planning' },                                    // summary
+    { id: 'spec',   name: 'Spec',   start: 0, duration: 4, parent: 'plan' },
+    { id: 'design', name: 'Design', duration: 6, parent: 'plan', dependsOn: ['spec'] },
+    { id: 'build',  name: 'Build' },                                        // summary
+    { id: 'api',    name: 'API', duration: 10, parent: 'build', dependsOn: ['design'] },
+    { id: 'ui',     name: 'UI',  duration: 7,  parent: 'build', dependsOn: ['design'], progress: 0.3 },
+    { id: 'launch', name: 'Launch', duration: 2, dependsOn: ['api', 'ui'] },
+  ],
+  onChange: (tasks) => save(tasks),     // fires after every edit
+});
+
+editor.addTask();          // also: deleteSelected, indentSelected, outdentSelected
+editor.setBaseline();      // freeze the current plan as the baseline
+const plan = editor.getTasks();
+```
+
 ### ★ Cascade — an SAP-style WBS critical-path what-if
 
 The question every PM asks and no tool answers visually: *"if this task slips, do
