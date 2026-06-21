@@ -47,6 +47,12 @@ export {
   type CpmNode,
   type CpmResult,
 } from './analysis/criticalpath.js';
+export {
+  GanttEditor,
+  type GanttEditorOptions,
+  type EditorTask,
+} from './editor/gantt-editor.js';
+export { schedule, type SchedTask, type SchedNode } from './editor/schedule.js';
 
 export { Chart } from './core/chart.js';
 export type {
