@@ -19,6 +19,7 @@ import { SankeyChart } from './sankey.js';
 import { StreamChart } from './stream.js';
 import { ForecastChart } from './forecast.js';
 import { CascadeChart } from './cascade.js';
+import { ChronicleChart } from './chronicle.js';
 import { forceReducedMotion } from '../motion/reduced-motion.js';
 import type { ChartData } from '../core/types.js';
 
@@ -748,6 +749,63 @@ describe('DonutChart smoke', () => {
     expect(d).toContain('L');
     expect(d.endsWith('Z')).toBe(true);
     expect(d).not.toMatch(/NaN/);
+    chart.destroy();
+  });
+});
+
+describe('ChronicleChart smoke', () => {
+  const tasks = () => [
+    // Landed: promised 10, finished on day 11.
+    { id: 'design', name: 'Design', history: [{ at: 0, finish: 10 }, { at: 5, finish: 10 }], actual: 11 },
+    // Slipping 0.5 d/d: honest fixed point = 40.
+    { id: 'api', name: 'API', history: [{ at: 0, finish: 20 }, { at: 10, finish: 25 }, { at: 20, finish: 30 }] },
+    // Runaway: promise recedes 1.2 d/d.
+    { id: 'infra', name: 'Infra', history: [{ at: 0, finish: 15 }, { at: 10, finish: 27 }, { at: 20, finish: 39 }] },
+  ];
+
+  it('renders a comet, reality diagonal and label per task, plus the now line', () => {
+    const el = host();
+    const chart = new ChronicleChart(el, { tasks: tasks() });
+    expect(el.querySelectorAll('svg polyline').length).toBe(3);
+    const texts = [...el.querySelectorAll('svg text')].map((t) => t.textContent);
+    expect(texts).toContain('Design');
+    expect(texts).toContain('Infra');
+    chart.destroy();
+    expect(el.querySelector('svg')).toBeNull();
+  });
+
+  it('at "today" the runaway shows ∞, the landed task shows its landing dot', () => {
+    const el = host();
+    const chart = new ChronicleChart(el, { tasks: tasks() });
+    // Reduced motion ⇒ τ jumps straight to the end of history.
+    const glyphs = [...el.querySelectorAll('svg text')].filter((t) => t.textContent === '∞');
+    expect(glyphs.some((g) => g.getAttribute('opacity') === '0.95')).toBe(true);
+    const dots = [...el.querySelectorAll('svg circle')].filter(
+      (c) => c.getAttribute('fill') === '#34d399' && c.getAttribute('opacity') === '1',
+    );
+    expect(dots.length).toBe(1); // design landed
+    chart.destroy();
+  });
+
+  it('scrubbing back in time hides re-plans that have not happened yet', () => {
+    const el = host();
+    const chart = new ChronicleChart(el, { tasks: tasks() });
+    chart.setAsOf(2, true); // before the day-10 re-plans
+    const hidden = [...el.querySelectorAll('svg circle')].filter(
+      (c) => c.getAttribute('r') === '2' && c.getAttribute('opacity') === '0',
+    );
+    expect(hidden.length).toBeGreaterThanOrEqual(4); // later snapshot dots are dark
+    chart.destroy();
+  });
+
+  it('statAt evolves with the scrub and matches the drift math', () => {
+    const el = host();
+    const chart = new ChronicleChart(el, { tasks: tasks() });
+    expect(chart.statAt('api', 5)!.velocity).toBe(0); // only one re-plan seen
+    const late = chart.statAt('api', 20)!;
+    expect(late.velocity).toBeCloseTo(0.5, 6);
+    expect(late.honest).toBeCloseTo(40, 4);
+    expect(chart.statAt('infra', 20)!.runaway).toBe(true);
     chart.destroy();
   });
 });

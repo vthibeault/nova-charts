@@ -1,4 +1,6 @@
 import { AnimatedVec } from '../motion/animated.js';
+import { runTween } from '../motion/tween.js';
+import { prefersReducedMotion } from '../motion/reduced-motion.js';
 import { schedule } from './schedule.js';
 
 export interface EditorTask {
@@ -90,6 +92,8 @@ interface Drag {
   startDay: number;
   startDur: number;
   linkLine?: SVGLineElement;
+  /** Bar currently hovered as a link target, and whether the link is legal. */
+  linkTarget?: { id: string; valid: boolean } | null;
 }
 
 /**
@@ -125,6 +129,9 @@ export class GanttEditor {
   private pointers = new Map<number, number>();
   private pinch: { startDist: number; startDayWidth: number } | null = null;
   private ro: ResizeObserver | null = null;
+  /** `${from}->${to}` of a just-created dependency; its connector draws itself in. */
+  private flashDep: string | null = null;
+  private stopFlash: (() => void) | null = null;
 
   constructor(el: HTMLElement, options: GanttEditorOptions) {
     injectCss();
@@ -214,6 +221,8 @@ export class GanttEditor {
       for (const u of b.depUnsub) u();
     }
     this.bars.clear();
+    this.stopFlash?.();
+    this.stopFlash = null;
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerUp);
@@ -319,12 +328,47 @@ export class GanttEditor {
 
   // ---- render ---------------------------------------------------------------
 
-  private commit(structural: boolean): void {
-    this.render(structural);
+  /**
+   * Re-render after an edit and notify. `focus` is the task the edit came
+   * from: its dependents ripple outward, staggered by dependency depth.
+   */
+  private commit(_structural: boolean, focus?: string): void {
+    this.render(false, focus);
     this.opts.onChange?.(this.getTasks());
   }
 
-  private render(immediate: boolean): void {
+  /** Dependency-depth map from an edited task through its successors (and up to their summaries). */
+  private successorDepths(root: string): Map<string, number> {
+    const depth = new Map<string, number>([[root, 0]]);
+    const queue = [root];
+    while (queue.length) {
+      const id = queue.shift()!;
+      const d = depth.get(id)!;
+      for (const t of this.tasks) {
+        if (t.dependsOn?.includes(id) && !depth.has(t.id)) {
+          depth.set(t.id, d + 1);
+          queue.push(t.id);
+        }
+      }
+    }
+    // Summary brackets ride with their earliest-moving descendant.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const t of this.tasks) {
+        const d = t.parent !== undefined ? depth.get(t.id) : undefined;
+        if (t.parent === undefined || d === undefined) continue;
+        const cur = depth.get(t.parent);
+        if (cur === undefined || d < cur) {
+          depth.set(t.parent, d);
+          changed = true;
+        }
+      }
+    }
+    return depth;
+  }
+
+  private render(immediate: boolean, focus?: string, trackFocus = false): void {
     this.sched = schedule(this.tasks);
     this.rows = this.visibleRows();
     const finishDays = Math.max(this.sched.finish + 3, 14);
@@ -337,7 +381,7 @@ export class GanttEditor {
 
     this.renderAxis(width, finishDays);
     this.renderGrid();
-    this.renderBars(immediate, width);
+    this.renderBars(immediate, width, focus, trackFocus);
   }
 
   private renderAxis(width: number, finishDays: number): void {
@@ -478,9 +522,10 @@ export class GanttEditor {
     input.addEventListener('blur', () => done(true));
   }
 
-  private renderBars(immediate: boolean, width: number): void {
+  private renderBars(immediate: boolean, width: number, focus?: string, trackFocus = false): void {
     const seen = new Set<string>();
     const spring = { stiffness: 200, damping: 26 };
+    const depths = focus && !immediate ? this.successorDepths(focus) : null;
     for (let i = 0; i < this.rows.length; i++) {
       const r = this.rows[i]!;
       const task = this.tasks.find((t) => t.id === r.id)!;
@@ -495,12 +540,21 @@ export class GanttEditor {
       let bar = this.bars.get(r.id);
       if (!bar) {
         const rectG = svgEl('g', { class: 'nge-barrow' }, this.barLayer);
-        const geo = new AnimatedVec([x, cy, w], spring);
+        // New bars grow out of their start edge instead of popping in.
+        const geo = new AnimatedVec([x, cy, immediate ? w : 2], spring);
         bar = { geo, rectG, depUnsub: [] };
         this.bars.set(r.id, bar);
         geo.onChange(() => this.paintBar(r.id));
       }
-      bar.geo.set([x, cy, w], { immediate });
+      // The dragged bar tracks the pointer 1:1; everything downstream of the
+      // edit springs after it, staggered by dependency depth — the reschedule
+      // visibly ripples through the plan.
+      const isFocus = r.id === focus;
+      const delay = depths && !isFocus ? (depths.get(r.id) ?? 0) * 60 : 0;
+      bar.geo.set([x, cy, w], {
+        immediate: immediate || (isFocus && trackFocus),
+        ...(delay > 0 ? { delays: Float64Array.of(delay, delay, delay) } : {}),
+      });
       // store render inputs on the element via data attributes
       bar.rectG.dataset.id = r.id;
       bar.rectG.dataset.summary = String(this.hasChildren(r.id));
@@ -594,13 +648,38 @@ export class GanttEditor {
         const tx = tg[0]!;
         const ty = tg[1]!;
         const ex = Math.max(sx + 8, tx - 10);
-        svgEl('path', {
+        const path = svgEl('path', {
           d: `M${sx},${sy}L${ex},${sy}L${ex},${ty}L${tx},${ty}`,
           fill: 'none', stroke: 'var(--nova-fg-muted,#94a3b8)', 'stroke-width': 1.3,
           'marker-end': 'url(#nge-arrow)', opacity: 0.7,
         }, this.linkLayer);
+        if (this.flashDep === `${dep}->${t.id}`) this.flashConnector(path);
       }
     }
+    this.flashDep = null;
+  }
+
+  /** A just-drawn dependency introduces itself: the connector draws in, glowing, then settles. */
+  private flashConnector(path: SVGPathElement): void {
+    if (prefersReducedMotion() || typeof path.getTotalLength !== 'function') return;
+    const len = path.getTotalLength();
+    if (!Number.isFinite(len) || len <= 0) return;
+    this.stopFlash?.();
+    path.setAttribute('stroke', 'var(--nova-c1,#6366f1)');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-dasharray', `${len}`);
+    this.stopFlash = runTween(
+      { from: len, to: 0, duration: 450 },
+      (v) => path.setAttribute('stroke-dashoffset', String(v)),
+      () => {
+        // Settle back to the resting connector style.
+        path.removeAttribute('stroke-dasharray');
+        path.removeAttribute('stroke-dashoffset');
+        path.setAttribute('stroke', 'var(--nova-fg-muted,#94a3b8)');
+        path.setAttribute('stroke-width', '1.3');
+        this.stopFlash = null;
+      },
+    );
   }
 
   // ---- interaction ----------------------------------------------------------
@@ -686,10 +765,10 @@ export class GanttEditor {
     const dDays = Math.round((p.x - this.drag.startX) / this.opts.dayWidth);
     if (this.drag.mode === 'move') {
       task.start = Math.max(0, this.drag.startDay + dDays);
-      this.render(true);
+      this.render(false, this.drag.id, true);
     } else if (this.drag.mode === 'resize') {
       task.duration = Math.max(1, this.drag.startDur + dDays);
-      this.render(true);
+      this.render(false, this.drag.id, true);
     } else if (this.drag.mode === 'progress') {
       const node = this.sched.nodes.get(this.drag.id)!;
       const x = this.dayX(node.start);
@@ -697,10 +776,42 @@ export class GanttEditor {
       task.progress = Math.max(0, Math.min(1, (p.x - x) / Math.max(w, 1)));
       this.paintBar(this.drag.id);
     } else if (this.drag.mode === 'link' && this.drag.linkLine) {
-      this.drag.linkLine.setAttribute('x2', String(p.x));
-      this.drag.linkLine.setAttribute('y2', String(p.y));
+      // Magnetic targets: highlight the bar under the pointer (red when the
+      // link would cycle) and snap the dashed line onto it.
+      const over = document.elementFromPoint(e.clientX, e.clientY);
+      const overId = over?.classList.contains('nge-bar') ? over.getAttribute('data-id') : null;
+      const prev = this.drag.linkTarget;
+      if (overId !== (prev?.id ?? null)) {
+        if (prev) this.paintBar(prev.id); // clear the old highlight
+        if (overId && overId !== this.drag.id) {
+          const valid = !this.wouldCycle(this.drag.id, overId);
+          this.drag.linkTarget = { id: overId, valid };
+          this.highlightLinkTarget(overId, valid);
+        } else {
+          this.drag.linkTarget = null;
+        }
+      }
+      const t = this.drag.linkTarget ? this.bars.get(this.drag.linkTarget.id) : null;
+      if (t && this.drag.linkTarget) {
+        this.drag.linkLine.setAttribute('x2', String(t.geo.values[0]!));
+        this.drag.linkLine.setAttribute('y2', String(t.geo.values[1]!));
+        this.drag.linkLine.setAttribute('stroke', this.drag.linkTarget.valid ? 'var(--nova-c1,#6366f1)' : '#fb7185');
+      } else {
+        this.drag.linkLine.setAttribute('x2', String(p.x));
+        this.drag.linkLine.setAttribute('y2', String(p.y));
+        this.drag.linkLine.setAttribute('stroke', 'var(--nova-c1,#6366f1)');
+      }
     }
   };
+
+  /** Temporary stroke on a bar while it is hovered as a link target. */
+  private highlightLinkTarget(id: string, valid: boolean): void {
+    const bar = this.bars.get(id);
+    const el = bar?.rectG.querySelector('.nge-bar');
+    if (!el) return;
+    el.setAttribute('stroke', valid ? 'var(--nova-c1,#6366f1)' : '#fb7185');
+    el.setAttribute('stroke-width', '2.5');
+  }
 
   private onPointerUp = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);
@@ -714,16 +825,24 @@ export class GanttEditor {
     this.drag = null;
     if (d.mode === 'link') {
       d.linkLine?.remove();
-      // Pointer capture retargets pointerup to the svg, so resolve the drop by hit-test.
+      if (d.linkTarget) this.paintBar(d.linkTarget.id); // clear highlight
+      // Prefer the tracked magnetic target; fall back to a hit-test (pointer
+      // capture retargets pointerup to the svg).
       const dropped = document.elementFromPoint(e.clientX, e.clientY);
-      const target = dropped?.getAttribute('data-id');
+      const target = d.linkTarget?.id ?? dropped?.getAttribute('data-id') ?? null;
       if (target && target !== d.id && !this.wouldCycle(d.id, target)) {
         const t = this.tasks.find((x) => x.id === target)!;
         const deps = new Set(t.dependsOn ?? []);
         deps.add(d.id);
         t.dependsOn = [...deps];
+        this.flashDep = `${d.id}->${target}`;
+        this.commit(false, target);
+        return;
       }
       this.commit(false);
+    } else if (d.mode === 'move' || d.mode === 'resize') {
+      // Release: the dragged bar snaps to its day slot and the change ripples.
+      this.commit(false, d.id);
     } else {
       this.commit(false);
     }

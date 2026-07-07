@@ -48,6 +48,17 @@ export {
   type CpmResult,
 } from './analysis/criticalpath.js';
 export {
+  ChronicleChart,
+  type ChronicleChartOptions,
+} from './chart/chronicle.js';
+export {
+  driftStat,
+  planAt,
+  type DriftTask,
+  type DriftPoint,
+  type DriftStat,
+} from './analysis/drift.js';
+export {
   GanttEditor,
   type GanttEditorOptions,
   type EditorTask,

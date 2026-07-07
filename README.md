@@ -14,7 +14,51 @@ Framework-agnostic. SVG-first. Zero dependencies. Built around one rule: *no cod
 
 ## Charts
 
-`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`** · **`CascadeChart`**
+`LineChart` · `AreaChart` (overlap or stacked) · `BarChart` (grouped or stacked) · `DonutChart` (or pie) · `ScatterChart` (or bubble) · `RadarChart` · `GaugeChart` · `HeatmapChart` · `PolarAreaChart` · `FunnelChart` · `WaterfallChart` · `CandlestickChart` · `GanttChart` · **`BudgetFlowChart`** · `TreemapChart` · `BoxPlotChart` · `SankeyChart` · **`StreamChart`** · **`ForecastChart`** · **`CascadeChart`** · **`ChronicleChart`**
+
+### ★ Chronicle — the plan time-machine
+
+Every PM tool shows the *current* plan and forgets every plan before it.
+**ChronicleChart** keeps each re-plan as a frame and lets you **scrub through
+your project's history** — drag anywhere (mouse or thumb) and the whole chart
+replays itself; mounting the chart replays the full history as its entrance.
+
+Inside each task's row, *down* is the report date and *right* is the promised
+finish, so every task draws a **drift comet**: a calm task falls straight down,
+a slipping one slants right, an accelerating one curves away. The faint in-band
+diagonal is the **reality line** (promise = report date) — a task is done when
+its comet reaches it — and extending the comet's fitted trajectory to that
+diagonal is, both geometrically and algebraically, the **⌖ honest finish**: the
+date the task is *actually* heading for, not the date the plan claims. A comet
+steeper than the diagonal never meets it — a **runaway (∞)** that will never
+land at its current drift. **!** flags a broken promise (the promised date
+passed; the task didn't). Colours track drift speed (green → amber → red), the
+headline names the task that decides the project, and the tooltip reads out
+slip, drift velocity in d/week, and the honest date — all *as of the scrub
+position*, so you can see exactly when a disaster first became knowable. The
+math (`driftStat`, `planAt`) is a pure, exported, unit-tested module.
+
+```ts
+import { ChronicleChart } from 'nova-charts';
+
+const chart = new ChronicleChart(el, {
+  startDate: new Date(2026, 3, 6),
+  deadline: 84,
+  today: 55,
+  tasks: [
+    // One point per re-plan: "as of day `at`, we promised to finish on `finish`".
+    { id: 'api', name: 'API build', history: [
+      { at: 0, finish: 45 }, { at: 10, finish: 49 }, { at: 20, finish: 54 },
+    ]},
+    { id: 'design', name: 'Design', history: [
+      { at: 0, finish: 22 }, { at: 10, finish: 25 },
+    ], actual: 26 },                       // landed
+  ],
+});
+chart.setAsOf(20);          // scrub to any day
+chart.replay();             // rewind and play the whole history
+chart.statAt('api');        // { velocity, slip, honest, runaway, … }
+```
 
 ### ★ Gantt Editor — an MS-Project-style editor, not just a chart
 
@@ -40,6 +84,13 @@ never fights the page scroll; **pinch the timeline to zoom** (the day under your
 fingers stays anchored); and on a narrow screen the grid **collapses to a frozen
 name column** while the timeline scrolls horizontally beside it. It works
 identically with a mouse or a thumb.
+
+**And it's alive.** Commit a drag and the reschedule **ripples visibly through
+the plan** — dependents spring after the edited bar, staggered by dependency
+depth, so you *watch* the change cascade. While drawing a dependency the bar
+under your pointer **lights up and the line snaps onto it magnetically** (red
+when the link would create a cycle), a **new connector draws itself in**, and
+added tasks **grow out of their start edge** instead of popping.
 
 ```ts
 import { GanttEditor } from 'nova-charts';
