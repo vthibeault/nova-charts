@@ -4,9 +4,11 @@ export function mountEditorDemo(host: HTMLElement): () => void {
   const header = document.createElement('div');
   header.className = 'demo-header';
   header.innerHTML =
-    '<h2>Gantt Editor</h2><p>An MS-Project-style editor. Double-click a name or duration to edit; ' +
-    'drag a bar to reschedule, drag its right edge to resize, drag the dot at a bar’s end onto another bar to ' +
-    'link them (dependents auto-reschedule). Use the toolbar to add/indent/outdent tasks, set a baseline, and zoom. ' +
+    '<h2>Gantt Editor</h2><p>An MS-Project-style editor that’s fully touch-first. ' +
+    'Drag a bar to reschedule, drag its right edge to resize, drag the dot at a bar’s end onto another bar to ' +
+    'link them (dependents auto-reschedule). Tap a row then tap its name or duration to edit (double-click works too). ' +
+    'Use the toolbar to add/indent/outdent tasks, set a baseline, and zoom — or pinch the timeline on a touch device. ' +
+    'On a phone the grid collapses to a frozen name column while the timeline scrolls. ' +
     'The critical path is red; the baseline shows as a grey strip under each bar.</p>';
   host.appendChild(header);
 

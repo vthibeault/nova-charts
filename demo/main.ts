@@ -18,6 +18,7 @@ import { mountSankeyDemo } from './demos/sankey.js';
 import { mountStreamDemo } from './demos/stream.js';
 import { mountForecastDemo } from './demos/forecast.js';
 import { mountCascadeDemo } from './demos/cascade.js';
+import { mountChronicleDemo } from './demos/chronicle.js';
 import { mountEditorDemo } from './demos/editor.js';
 import { mountStressDemo } from './demos/stress.js';
 
@@ -44,6 +45,7 @@ const demos: { id: string; name: string; mount: DemoMount }[] = [
   { id: 'stream', name: '★ Stream', mount: mountStreamDemo },
   { id: 'forecast', name: '★ Forecast', mount: mountForecastDemo },
   { id: 'cascade', name: '★ Cascade', mount: mountCascadeDemo },
+  { id: 'chronicle', name: '★ Chronicle', mount: mountChronicleDemo },
   { id: 'editor', name: '★ Gantt Editor', mount: mountEditorDemo },
   { id: 'stress', name: 'Stress test', mount: mountStressDemo },
 ];
